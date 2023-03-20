@@ -2,6 +2,7 @@ import os
 import openai
 import random
 import time
+from functools import wraps
 
 
 def retry_with_exponential_backoff(
@@ -26,6 +27,7 @@ def retry_with_exponential_backoff(
 
             # Retry on specified errors
             except errors as e:
+                print(f"Error: {e}")
                 # Increment retries
                 num_retries += 1
 
@@ -51,3 +53,20 @@ def retry_with_exponential_backoff(
 @retry_with_exponential_backoff
 def openai_chat_completion(**kwargs):
     return openai.ChatCompletion.create(**kwargs)
+
+
+def chat_gpt_prompt(func):
+    """A decorator that takes a function that creates a prompt and executes the result."""
+    # Wondering if there is a better name for this
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        prompt = func(*args, **kwargs)
+        response = openai_chat_completion(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+        )
+        return response.choices[0].message.content
+
+    return wrapper
