@@ -96,9 +96,30 @@ class KnowledgeNode:
         self.id = uuid.uuid4()
         self.summary_nodes = summary_nodes
         self.content: str
+    
 
-    def build(self) -> str:
-        # Implement a method to turn the summary nodes into a knowledge base article
+    @chat_gpt_prompt
+    def _article_prompt(self):
+        """
+        Generates a knowledge base article based on the summary nodes. ChatGPT
+        executes the prompt returned by this method.
+        """
+
+        prompt = "The following is a collection of summaries of chat logs:\n\n"
+
+        for index, summary_node in enumerate(self.summary_nodes):
+            prompt += f"{index+1}. {summary_node.content}\n\n"
+        
+        prompt += "Write an executive summary of the above text " \
+                  "taking into account only the most salient information:"
+
+        return prompt
+
+
+    def generate_article(self) -> str:
+        self.content = self._article_prompt()
+
+    def update_article(self, summary_node):
         raise NotImplementedError
 
     def to_dict(self) -> Dict:
@@ -152,6 +173,17 @@ class HierarchicalMemory:
         self.logs.append(log)
         if len(self.logs) == 10:
             self.build_summary_node()
+    
+    def _semantic_similarity(self, summary_node):
+        """
+        This method is responsible for calculating the semantic similarity
+        between a summary node and the knowledge nodes.
+        """
+        if len(self.knowledge_nodes) == 0:
+            return None
+
+        raise NotImplementedError
+
 
     def build_summary_node(self) -> None:
         """After a rolling window of 10 logs, we build a summary node that summarizes the logs"""
@@ -160,10 +192,25 @@ class HierarchicalMemory:
         self.summary_nodes.append(summary_node)
         self.logs = []
 
-    def build_knowledge_nodes(self) -> None:
+        # If there are no knowledge nodes, we create one with the summary node
+        # If there are knowledge nodes, we check if the summary node is similar to any of them
+        # If it is, we update the closest knowledge base article with the summary node
+        similar_knowledge_node = self._semantic_similarity(summary_node)
+
+        if similar_knowledge_node is not None:
+            similar_knowledge_node.summary_nodes.append(summary_node)
+            similar_knowledge_node.update_article(summary_node)
+        else:
+            knowledge_node = KnowledgeNode(summary_nodes=[summary_node])
+            knowledge_node.generate_article()
+            self.knowledge_nodes.append(knowledge_node)
+        # If it is not, we create a new knowledge base article with the summary node
+
+
+    def reindex_knowledge_nodes(self) -> None:
         """
         Clusters summary nodes into different groups, and then uses llm to
-        come up with a knowledge base article for each group
+        come up with a knowledge base article for each group.
         """
         raise NotImplementedError
 
