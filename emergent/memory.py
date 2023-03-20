@@ -3,6 +3,8 @@ from typing import List, Dict
 from collections import defaultdict
 from datetime import datetime
 
+from .llms import chat_gpt_prompt
+
 
 class MemoryLog:
     """
@@ -45,10 +47,26 @@ class SummaryNode:
         self.logs = logs
         self.content: str
         self.created_at = datetime.now()
+    
+    @chat_gpt_prompt
+    def _summary_prompt(self) -> str:
+        """
+        Generates a summary of the memory logs. ChatGPT executes the prompt 
+        returned by this method.
+        """
 
+        prompt = "The following is a conversation between you and the user:\n\n"
+
+        for log in self.logs:
+            prompt += f"{log.role.capitalize()}: {log.content}\n\n"
+        
+        prompt += "Based on the above conversation, write an executive summary:"
+
+        return prompt
+    
     def generate_summary(self) -> str:
-        # Implement a method to generate a summary from the logs
-        raise NotImplementedError
+        """Generate a summary of the memory logs."""
+        self.content = self._summary_prompt()
 
     def to_dict(self) -> Dict:
         return {
@@ -74,9 +92,9 @@ class KnowledgeNode:
     or representation of a group of (clustered) summary nodes.
     """
 
-    def __init__(self, summary_node: List[SummaryNode]):
+    def __init__(self, summary_nodes: List[SummaryNode]):
         self.id = uuid.uuid4()
-        self.summary_node = summary_node
+        self.summary_nodes = summary_nodes
         self.content: str
 
     def build(self) -> str:
@@ -86,16 +104,16 @@ class KnowledgeNode:
     def to_dict(self) -> Dict:
         return {
             "id": str(self.id),
-            "summary_node": [cluster.to_dict() for cluster in self.summary_node],
+            "summary_nodes": [cluster.to_dict() for cluster in self.summary_nodes],
             "content": self.content,
         }
 
     @staticmethod
     def from_dict(data: Dict):
-        summary_node = [
-            SummaryNode.from_dict(cluster_data) for cluster_data in data["summary_node"]
+        summary_nodes = [
+            SummaryNode.from_dict(cluster_data) for cluster_data in data["summary_nodes"]
         ]
-        knowledge_node = KnowledgeNode(summary_node=summary_node)
+        knowledge_node = KnowledgeNode(summary_nodes=summary_nodes)
         knowledge_node.id = uuid.UUID(data["id"])
         knowledge_node.content = data["content"]
         return knowledge_node
@@ -105,6 +123,18 @@ class HierarchicalMemory:
     """
     This class manages the HMCS system. It is responsible for building the
     summary nodes, knowledge nodes and also querying for memories.
+
+    Example
+    -------
+    >>> memory = HierarchicalMemory()
+    >>> node = memory.query("What is the birthday of bob")
+    >>> node
+    KnowledgeNode(content="Bob is a user that I interacted with on 12/03/2023, Bob's birthday is on 1/1/2000")
+    >>> node.summary_nodes[0].logs
+    [
+        MemoryLog(role="user", content="My name is Bob"), 
+        MemoryLog(role="user", content="My birthday is on 1/1/2000")
+    ]
     """
 
     def __init__(self):
@@ -112,16 +142,16 @@ class HierarchicalMemory:
         self.summary_nodes: list = []
         self.knowledge_nodes: list = []
 
-    def add_log(self, log: MemoryLog) -> None:
-        self.logs.append(log)
-        if len(self.logs) == 10:
-            self.build_summary_node()
-
     def query(self, query: str) -> KnowledgeNode:
         """
         This method is responsible for querying the memory for a given query.
         """
         raise NotImplementedError
+
+    def add_log(self, log: MemoryLog) -> None:
+        self.logs.append(log)
+        if len(self.logs) == 10:
+            self.build_summary_node()
 
     def build_summary_node(self) -> None:
         """After a rolling window of 10 logs, we build a summary node that summarizes the logs"""
@@ -139,12 +169,8 @@ class HierarchicalMemory:
 
 
 if __name__ == "__main__":
-    memory = HierarchicalMemory()
+    
 
     """
-    >>> node = memory.query("What is the birthday of bob")
-    >>> node
-    KnowledgeNode(content="Bob is a user that I interacted with on 12/03/2023, Bob's birthday is on 1/1/2000")
-    >>> node.summary_node.logs
-    [MemoryLog(role="user", content="My name is Bob"), MemoryLog(role="user", content="My birthday is on 1/1/2000")]
+
     """
