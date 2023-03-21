@@ -2,9 +2,18 @@ import uuid
 from typing import List, Dict
 from collections import defaultdict
 from datetime import datetime
+import json
 
-from .llms import chat_gpt_prompt
+from openai.embeddings_utils import cosine_similarity
 
+from .llms import chat_gpt_prompt, get_embedding
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super(DateTimeEncoder, self).default(obj)
 
 class MemoryLog:
     """
@@ -47,6 +56,7 @@ class SummaryNode:
         self.logs = logs
         self.content: str
         self.created_at = datetime.now()
+        self.embedding = None
     
     @chat_gpt_prompt
     def _summary_prompt(self) -> str:
@@ -60,13 +70,14 @@ class SummaryNode:
         for log in self.logs:
             prompt += f"{log.role.capitalize()}: {log.content}\n\n"
         
-        prompt += "Based on the above conversation, write an executive summary:"
+        prompt += "Based on the above conversation, write an executive summary with only the most important information. Make sure to include important things like user information, ideas, events, etc.:"
 
         return prompt
     
     def generate_summary(self) -> str:
         """Generate a summary of the memory logs."""
         self.content = self._summary_prompt()
+        self.embedding = get_embedding(self.content)
 
     def to_dict(self) -> Dict:
         return {
@@ -103,24 +114,36 @@ class KnowledgeNode:
         """
         Generates a knowledge base article based on the summary nodes. ChatGPT
         executes the prompt returned by this method.
-        """
+        """ 
 
         prompt = "The following is a collection of summaries of chat logs:\n\n"
+
 
         for index, summary_node in enumerate(self.summary_nodes):
             prompt += f"{index+1}. {summary_node.content}\n\n"
         
-        prompt += "Write an executive summary of the above text " \
-                  "taking into account only the most salient information:"
+        prompt += "Write a concise summary about the most important details that you can extract from the summary" \
+                  "You must have a title that represent the topic of the article. " \
+                  "The title should categorise this summary as either related to " \
+                  "A person or name, Places, Things, Events, or Concepts. \n" \
+                  "An example title would be: 'Personal information about the user' and the body would contain important details "
 
         return prompt
+    
 
+    def _update_article_prompt(self, new_summary_node):
+        # TODO: make a more advanced version of this
+        return self._article_prompt()
 
     def generate_article(self) -> str:
         self.content = self._article_prompt()
+        print("<>",self.content,"<>")
+        self.embedding = get_embedding(self.content)
 
     def update_article(self, summary_node):
-        raise NotImplementedError
+        self.content = self._update_article_prompt(summary_node)
+        self.embedding = get_embedding(self.content)
+
 
     def to_dict(self) -> Dict:
         return {
@@ -162,6 +185,13 @@ class HierarchicalMemory:
         self.logs: list = []
         self.summary_nodes: list = []
         self.knowledge_nodes: list = []
+    
+    def to_json(self) -> str:
+        return json.dumps({
+            "logs": [log.to_dict() for log in self.logs],
+            "summary_nodes": [summary_node.to_dict() for summary_node in self.summary_nodes],
+            "knowledge_nodes": [knowledge_node.to_dict() for knowledge_node in self.knowledge_nodes],
+        }, indent=4, cls=DateTimeEncoder)
 
     def query(self, query: str) -> KnowledgeNode:
         """
@@ -169,10 +199,12 @@ class HierarchicalMemory:
         """
         raise NotImplementedError
 
-    def add_log(self, log: MemoryLog) -> None:
+    def add_log(self, role, content) -> None:
+        log = MemoryLog(role=role, content=content)
         self.logs.append(log)
-        if len(self.logs) == 10:
+        if len(self.logs) == 4:
             self.build_summary_node()
+
     
     def _semantic_similarity(self, summary_node):
         """
@@ -182,13 +214,25 @@ class HierarchicalMemory:
         if len(self.knowledge_nodes) == 0:
             return None
 
-        raise NotImplementedError
+        threshold = 0.8
+
+        embedding = summary_node.embedding
+
+        for knowledge_node in self.knowledge_nodes:
+            similarity = cosine_similarity(embedding, knowledge_node.embedding)
+            print(similarity)
+            if similarity > threshold:
+                return knowledge_node
+
+
+         
 
 
     def build_summary_node(self) -> None:
         """After a rolling window of 10 logs, we build a summary node that summarizes the logs"""
         summary_node = SummaryNode(self.logs)
         summary_node.generate_summary()
+        print("<created summary node>")
         self.summary_nodes.append(summary_node)
         self.logs = []
 
@@ -200,7 +244,10 @@ class HierarchicalMemory:
         if similar_knowledge_node is not None:
             similar_knowledge_node.summary_nodes.append(summary_node)
             similar_knowledge_node.update_article(summary_node)
+            print("<updated knowledge node>")
+            print("<>", similar_knowledge_node.content, "<>")
         else:
+            print("<creating new knowledge node>")
             knowledge_node = KnowledgeNode(summary_nodes=[summary_node])
             knowledge_node.generate_article()
             self.knowledge_nodes.append(knowledge_node)
@@ -214,10 +261,3 @@ class HierarchicalMemory:
         """
         raise NotImplementedError
 
-
-if __name__ == "__main__":
-    
-
-    """
-
-    """

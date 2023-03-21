@@ -16,9 +16,7 @@ class ChatAgent:
     def add_message(self, role: str, content: str):
         """Add a message to the agent's memory."""
         self.messages.append({"role": role, "content": content})
-
-        if self.memory:
-            raise NotImplementedError
+        self.memory.add_log(role, content)
 
     def get_response(self, message) -> str:
         """Get a response from the agent."""
