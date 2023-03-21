@@ -9,7 +9,7 @@ Note: This is a work in progress
 ```python
 from emergent import ChatAgent, HierarchicalMemory
 
-memory = HierarchicalMemory()
+memory = HierarchicalMemory.from_json("memories.json")
 agent = ChatAgent(memory=memory)
 
 response = agent.send("What is my birthday?")
