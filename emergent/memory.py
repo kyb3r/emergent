@@ -3,10 +3,9 @@ from typing import List, Dict
 from collections import defaultdict
 from datetime import datetime
 import json
-
+import logging
 from openai.embeddings_utils import cosine_similarity
-
-from .llms import chat_gpt_prompt, get_embedding
+from llms import chat_gpt_prompt, get_embedding
 
 
 class DateTimeEncoder(json.JSONEncoder):
@@ -140,7 +139,7 @@ class KnowledgeNode:
 
     def generate_article(self) -> str:
         self.content = self._article_prompt()
-        print("<>", self.content, "<>")
+        logging.info(f"<>{self.content}<>")
         self.embedding = get_embedding(self.content)
 
     def update_article(self, summary_node):
@@ -190,7 +189,7 @@ class HierarchicalMemory:
         self.logs: list = []
         self.summary_nodes: list = []
         self.knowledge_nodes: list = []
-        self.rolling_window_size = 10
+        self.rolling_window_size = 20
 
     def query(self, query: str) -> KnowledgeNode:
         """
@@ -256,7 +255,7 @@ class HierarchicalMemory:
         """After a rolling window of X logs, we build a summary node that summarizes the logs"""
         summary_node = SummaryNode(self.logs)
         summary_node.generate_summary()
-        print("<created summary node>")
+        logging.info("<created summary node>")
         self.summary_nodes.append(summary_node)
         self.logs = []
 
@@ -268,10 +267,10 @@ class HierarchicalMemory:
         if similar_knowledge_node is not None:
             similar_knowledge_node.summary_nodes.append(summary_node)
             similar_knowledge_node.update_article(summary_node)
-            print("<updated knowledge node>")
-            print("<>", similar_knowledge_node.content, "<>")
+            logging.info("<updated knowledge node>")
+            logging.info(f"<> {similar_knowledge_node.content} <>")
         else:
-            print("<creating new knowledge node>")
+            logging.info("<creating new knowledge node>")
             knowledge_node = KnowledgeNode(summary_nodes=[summary_node])
             knowledge_node.generate_article()
             self.knowledge_nodes.append(knowledge_node)
@@ -305,13 +304,13 @@ class HierarchicalMemory:
             data = json.load(f)
 
         memory = cls()
-        memory.logs = [MemoryLog.from_dict(log_data) for log_data in data.get("logs", [])]
+        memory.logs = [MemoryLog.from_dict(log_data) for log_data in data["logs"]]
         memory.summary_nodes = [
             SummaryNode.from_dict(summary_node_data)
-            for summary_node_data in data.get("summary_nodes", [])
+            for summary_node_data in data["summary_nodes"]
         ]
         memory.knowledge_nodes = [
             KnowledgeNode.from_dict(knowledge_node_data)
-            for knowledge_node_data in data.get("knowledge_nodes", [])
+            for knowledge_node_data in data["knowledge_nodes"]
         ]
         return memory
