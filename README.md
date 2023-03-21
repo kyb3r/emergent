@@ -63,3 +63,8 @@ Agent: The user is you, Bob.
 ```
 pip install git+https://github.com/kyb3r/emergent
 ```
+
+or for development, clone the repository and then run
+```
+pip install -e .
+```
