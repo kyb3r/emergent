@@ -18,6 +18,8 @@ class ChatAgent:
         """Add a message to the agent's memory."""
         self.messages.append({"role": role, "content": content})
         self.memory.add_log(role, content)
+        with open("memories.json", "w") as f:
+            f.write(self.memory.to_json())
 
     def get_response(self, message) -> str:
         """Get a response from the agent."""
