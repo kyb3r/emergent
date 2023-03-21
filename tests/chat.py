@@ -1,7 +1,13 @@
 from emergent import ChatAgent, HierarchicalMemory
 
-memory = HierarchicalMemory()
+from openai.embeddings_utils import get_embedding
+
+memory = HierarchicalMemory.from_json("memories.json")
+
+print("Loaded memories")
+
 agent = ChatAgent(memory=memory)
+agent.memory.logs = []
 
 while True:
     message = input("You: ")
@@ -10,5 +16,9 @@ while True:
     response = agent.send(message)
     print("Agent:", response)
 
+print(agent.messages)
 
-print(memory.to_json())
+# with open("memories.json", "w") as f:
+#     f.write(memory.to_json())
+
+# print(memory.to_json())
