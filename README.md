@@ -17,9 +17,7 @@ response = agent.send("What is my birthday?")
 
 # Example conversation
 
-I had a conversation with chatgpt earlier, I introduced it to myself as "Bob" and gave it some personal details, like hometown and age. The memory system automatically created a knowledge base article about me. Later on, I started talking to it about HMCS and I gave it a simple explanation. The memory system determined that this new stuff that we are talking about is different from the personal details we talked about earlier. So it created a new knowledge base article. And whenever I gave new information about the same topic, it updated its memory to have a new summary of the topic. 
-
-After that conversation. I saved the memory to a json file and wiped chatGPT's context window. I had a new conversation and it seem's like it can remember relevant details well. 
+I had a conversation with chatgpt earlier about two different topics. After that conversation. I saved the memory to a json file and wiped chatGPT's context window. When we started a new conversation, ChatGPT demonstrated its ability to recall pertinent details effectively.
 
 ```
 You: Do you remember me David, I'm bob
