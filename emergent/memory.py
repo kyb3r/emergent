@@ -190,38 +190,7 @@ class HierarchicalMemory:
         self.logs: list = []
         self.summary_nodes: list = []
         self.knowledge_nodes: list = []
-
-    def to_json(self) -> str:
-        return json.dumps(
-            {
-                "logs": [log.to_dict() for log in self.logs],
-                "summary_nodes": [
-                    summary_node.to_dict() for summary_node in self.summary_nodes
-                ],
-                "knowledge_nodes": [
-                    knowledge_node.to_dict() for knowledge_node in self.knowledge_nodes
-                ],
-            },
-            indent=4,
-            cls=DateTimeEncoder,
-        )
-    
-    @classmethod
-    def from_json(cls, path: str):
-        with open(path) as f:
-            data = json.load(f)
-
-        memory = cls()
-        memory.logs = [MemoryLog.from_dict(log_data) for log_data in data["logs"]]
-        memory.summary_nodes = [
-            SummaryNode.from_dict(summary_node_data)
-            for summary_node_data in data["summary_nodes"]
-        ]
-        memory.knowledge_nodes = [
-            KnowledgeNode.from_dict(knowledge_node_data)
-            for knowledge_node_data in data["knowledge_nodes"]
-        ]
-        return memory
+        self.rolling_window_size = 20
 
     def query(self, query: str) -> KnowledgeNode:
         """
@@ -240,7 +209,7 @@ class HierarchicalMemory:
     def add_log(self, role, content) -> None:
         log = MemoryLog(role=role, content=content)
         self.logs.append(log)
-        if len(self.logs) == 20:
+        if len(self.logs) == self.rolling_window_size:
             self.build_summary_node()
 
     @chat_gpt_prompt
@@ -284,7 +253,7 @@ class HierarchicalMemory:
             return None
 
     def build_summary_node(self) -> None:
-        """After a rolling window of 10 logs, we build a summary node that summarizes the logs"""
+        """After a rolling window of X logs, we build a summary node that summarizes the logs"""
         summary_node = SummaryNode(self.logs)
         summary_node.generate_summary()
         print("<created summary node>")
@@ -314,3 +283,35 @@ class HierarchicalMemory:
         come up with a knowledge base article for each group.
         """
         raise NotImplementedError
+
+    def to_json(self) -> str:
+        return json.dumps(
+            {
+                "logs": [log.to_dict() for log in self.logs],
+                "summary_nodes": [
+                    summary_node.to_dict() for summary_node in self.summary_nodes
+                ],
+                "knowledge_nodes": [
+                    knowledge_node.to_dict() for knowledge_node in self.knowledge_nodes
+                ],
+            },
+            indent=4,
+            cls=DateTimeEncoder,
+        )
+    
+    @classmethod
+    def from_json(cls, path: str):
+        with open(path) as f:
+            data = json.load(f)
+
+        memory = cls()
+        memory.logs = [MemoryLog.from_dict(log_data) for log_data in data["logs"]]
+        memory.summary_nodes = [
+            SummaryNode.from_dict(summary_node_data)
+            for summary_node_data in data["summary_nodes"]
+        ]
+        memory.knowledge_nodes = [
+            KnowledgeNode.from_dict(knowledge_node_data)
+            for knowledge_node_data in data["knowledge_nodes"]
+        ]
+        return memory
