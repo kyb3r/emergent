@@ -190,7 +190,7 @@ class HierarchicalMemory:
         self.logs: list = []
         self.summary_nodes: list = []
         self.knowledge_nodes: list = []
-        self.rolling_window_size = 20
+        self.rolling_window_size = 10
 
     def query(self, query: str) -> KnowledgeNode:
         """
@@ -305,13 +305,13 @@ class HierarchicalMemory:
             data = json.load(f)
 
         memory = cls()
-        memory.logs = [MemoryLog.from_dict(log_data) for log_data in data["logs"]]
+        memory.logs = [MemoryLog.from_dict(log_data) for log_data in data.get("logs", [])]
         memory.summary_nodes = [
             SummaryNode.from_dict(summary_node_data)
-            for summary_node_data in data["summary_nodes"]
+            for summary_node_data in data.get("summary_nodes", [])
         ]
         memory.knowledge_nodes = [
             KnowledgeNode.from_dict(knowledge_node_data)
-            for knowledge_node_data in data["knowledge_nodes"]
+            for knowledge_node_data in data.get("knowledge_nodes", [])
         ]
         return memory
