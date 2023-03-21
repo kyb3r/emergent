@@ -2,14 +2,35 @@
 
 Emergent is an implementation of the Hierarchical Memory Consolidation System ([HMCS](https://github.com/daveshap/HierarchicalMemoryConsolidationSystem)) for large language models like ChatGPT. HMCS aims to mimic human-like memory organization and recall, enabling efficient storage and retrieval of information while adapting to growing data.
 
-Note: This is a work in progress
+# Overview
+
+The HMCS consists of several key components and processes:
+
+1. Log-based memory: Records thoughts, inputs, and outputs as individual logs.
+2. Rollup summaries: Periodically consolidates logs into higher-level summaries to reduce memory load.
+3. KB articles: Organizes rollup summaries based on semantic similarity to create or update knowledge base (KB) articles.
+4. Clustering or gating functions: Determines topical boundaries for efficient storage and retrieval of information.
+5. Scalability: Adapts memory management to accommodate growing data volumes.
+6. Periodic reindexing events: Optimizes memory by reorganizing and pruning the hierarchy as needed.
+
+
+## Note: This is a work in progress
+
+This project tries to implement this system, here's the progress so far.
+- [x] Log based memory
+- [x] Rollup summaries 
+- [x] KB articles, automatically create or update existing KB articles
+- [x] Clustering, or gating functions (We use an LLM to make a classifcation whether or not a summary is relevant to the KB article as a gating function)
+- [ ] Scalability
+- [ ] Periodic reindexing
+
 
 # Usage
 
 ```python
 from emergent import ChatAgent, HierarchicalMemory
 
-memory = HierarchicalMemory()
+memory = HierarchicalMemory.from_json("memories.json")
 agent = ChatAgent(memory=memory)
 
 response = agent.send("What is my birthday?")
@@ -17,9 +38,7 @@ response = agent.send("What is my birthday?")
 
 # Example conversation
 
-I had a conversation with chatgpt earlier, I introduced it to myself as "Bob" and gave it some personal details, like hometown and age. The memory system automatically created a knowledge base article about me. Later on, I started talking to it about HMCS and I gave it a simple explanation. The memory system determined that this new stuff that we are talking about is different from the personal details we talked about earlier. So it created a new knowledge base article. And whenever I gave new information about the same topic, it updated its memory to have a new summary of the topic. 
-
-After that conversation. I saved the memory to a json file and wiped chatGPT's context window. I had a new conversation and it seem's like it can remember relevant details well. 
+I had a conversation with chatgpt earlier about two different topics. After that conversation. I saved the memory to a json file and wiped chatGPT's context window. When we started a new conversation, ChatGPT demonstrated its ability to recall pertinent details effectively.
 
 ```
 You: Do you remember me David, I'm bob
