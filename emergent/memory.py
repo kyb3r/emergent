@@ -71,7 +71,15 @@ class SummaryNode:
         for log in self.logs:
             prompt += f"{log.role.capitalize()}: {log.content}\n\n"
 
-        prompt += "Based on the above conversation, write an executive summary with only the most important information. Make sure to include important things like user information, ideas, events, etc.:"
+        prompt += (
+            "Based on the above conversation, write a concise yet comprehensive "
+            "executive summary highlighting the most important and salient "
+            "information. Focus on essential details such as personal information, people, places, things, "
+            "concepts, events, and ideas discussed in the conversation. "
+            "Please ignore any unimportant dialogue or irrelevant information "
+            "that does not contribute to the salient parts of the conversation. "
+            "For example if a user talks about himself, make sure to include dot points about his details. Don't just say that `the use shared the information`, you must record it"
+        )
 
         return prompt
 
@@ -219,11 +227,11 @@ class HierarchicalMemory:
         a new knowledge node or an existing knowledge node.
         """
         prompt = (
-            f"Given the following summary:\n\n{summary_node.content}\n\n"
-            f"and the following knowledge base article:\n\n{knowledge_node.content}\n\n"
-            "Please classify whether the summary has relevent information that can be added to the knowledge base article.\n\n"
-            "If the summary is not related or relevant to the knowledge base article, please answer with `<no>`\n\n"
-            "If the summary is relevant to the knowledge base article, please answer with `<yes>`\n\n"
+            f"Given the following summary (X):\n\n{summary_node.content}\n\n"
+            f"and the following text (Y):\n\n{knowledge_node.content}\n\n"
+            "Please classify whether the summary is similar or distinct to the text. If Y has a title, please compare the summary to the title.\n\n"
+            "If the summary has a different/distinct topic to the provided text, please answer with `<no>`\n\n"
+            "If the summary is similar to the provided text, please answer with `<yes>`\n\n"
         )
 
         return prompt
@@ -247,7 +255,9 @@ class HierarchicalMemory:
         most_similar = max(similarities, key=lambda x: x[0])
         knowledge_node = most_similar[1]
 
-        if "<yes>" in self._llm_classification(summary_node, knowledge_node):
+        classification = self._llm_classification(summary_node, knowledge_node)
+        print(classification)
+        if "<yes>" in classification:
             return knowledge_node
         else:
             return None
