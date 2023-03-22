@@ -1,3 +1,4 @@
+import logging
 import os
 import openai
 import random
@@ -27,7 +28,7 @@ def retry_with_exponential_backoff(
 
             # Retry on specified errors
             except errors as e:
-                print(f"Error: {e}")
+                logging.ERROR(f"Error: {e}")
                 # Increment retries
                 num_retries += 1
 

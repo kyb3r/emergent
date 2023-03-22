@@ -65,12 +65,13 @@ class SummaryNode:
         returned by this method.
         """
 
-        prompt = "The following is a conversation between you and the user:\n\n"
+        prompt = "The following is a conversation between the ASSISTANT and the USER:\n\n"
 
         for log in self.logs:
             prompt += f"{log.role.capitalize()}: {log.content}\n\n"
 
-        prompt += "Based on the above conversation, write an executive summary with only the most important information. Make sure to include important things like user information, ideas, events, etc.:"
+        prompt += "TASK: Based on the above conversation, write a concise list of the information that was shared between the USER and the ASSISTANT." \
+                  "Include every piece of knowledge that was shared, regarding persons, concepts or events, do not add any information that did not come up in the conversation."
 
         return prompt
 
@@ -108,42 +109,63 @@ class KnowledgeNode:
     def __init__(self, summary_nodes: List[SummaryNode]):
         self.id = uuid.uuid4()
         self.summary_nodes = summary_nodes
+        self.topic = None
         self.content: str
         self.embedding = None
 
     @chat_gpt_prompt
-    def _article_prompt(self):
+    def topic_prompt(self):
+        prompt = f"ARTICLE: {self.content}"
+        prompt += (
+            f"TASK: Based on this ARTICLE please write an heading for the ARTICLE. The heading should be informative and capture the essence of the content of the article."
+            f"Only return the heading"
+        )
+        return prompt
+
+    def generate_topic(self):
+        self.topic = self.topic_prompt
+
+    @chat_gpt_prompt
+    def _article_prompt(self, topic):
         """
-        Generates a knowledge base article based on the summary nodes. ChatGPT
+        Generates a knowledge base article based on the summary nodes, and the topic provided. ChatGPT
         executes the prompt returned by this method.
         """
 
-        prompt = "The following is a collection of summaries of chat logs:\n\n"
+        prompt = "INFORMATION: "
 
         for index, summary_node in enumerate(self.summary_nodes):
             prompt += f"{index+1}. {summary_node.content}\n\n"
 
         prompt += (
-            "Write a concise summary about the most important details that you can extract from the summary"
-            "You must have a title that represent the topic of the article. "
-            "The title should categorise this summary as either related to "
-            "A person or name, Places, Things, Events, or Concepts. \n"
-            "An example title would be: 'Personal information about the user' and the body would contain important details "
+            f"TASK: Based on this INFORMATION, extract all knowledge that regards the following topic: {topic},"
+            f"and write a short knwoledge article about that topic. Be sure to include each piece of knowledge, that directly relates to {topic} and was included in the INFORMATION."
+            f"Don't add anything that was not included in the INFORMATION. Return only the knowledge article"
         )
 
         return prompt
 
-    def _update_article_prompt(self, new_summary_node):
-        # TODO: make a more advanced version of this
-        return self._article_prompt()
+    @chat_gpt_prompt
+    def _update_article_prompt(self, new_summary_node, topic):
+        prompt = f"ARTICLE: {self.content}"
 
-    def generate_article(self) -> str:
-        self.content = self._article_prompt()
+        prompt += f"NEW INFORMATION:  {new_summary_node}\n\n"
+
+        prompt += (
+            f"TASK: Based on this NEW INFORMATION, update the ARTICLE with all information that regards the following topic: {topic}. "
+            f"Be sure to include each piece of knowledge, that directly relates to {topic} and was included in the NEW INFORMATION or the ARTICLE."
+            f"Don't add anything that was not included in the NEW INFORMATION or the ARTICLE. Return only the updated article"
+        )
+
+        return prompt
+
+    def generate_article(self, topic):
+        self.content = self._article_prompt(topic)
         logging.info(f"<>{self.content}<>")
         self.embedding = get_embedding(self.content)
 
-    def update_article(self, summary_node):
-        self.content = self._update_article_prompt(summary_node)
+    def update_article(self, summary_node, topic):
+        self.content = self._update_article_prompt(summary_node, topic)
         self.embedding = get_embedding(self.content)
 
     def to_dict(self) -> Dict:
@@ -220,20 +242,20 @@ class HierarchicalMemory:
         prompt = (
             f"Given the following summary:\n\n{summary_node.content}\n\n"
             f"and the following knowledge base article:\n\n{knowledge_node.content}\n\n"
-            "Please classify whether the summary has relevent information that can be added to the knowledge base article.\n\n"
+            "Please classify whether the summary has relevant information that can be added to the knowledge base article.\n\n"
             "If the summary is not related or relevant to the knowledge base article, please answer with `<no>`\n\n"
             "If the summary is relevant to the knowledge base article, please answer with `<yes>`\n\n"
         )
 
         return prompt
 
-    def _semantic_similarity(self, summary_node):
+    def _semantic_similarity(self, summary_node, n_nearest=1):
         """
-        This method is responsible for calculating the semantic similarity
-        between a summary node and the knowledge nodes.
+        This method is responsible for calculating the semantic similarity between a summary node and the knowledge nodes.
+        The method returns the n_nearest knowledge nodes to the summary node in embedding space
         """
         if len(self.knowledge_nodes) == 0:
-            return None
+            return [None]
 
         embedding = summary_node.embedding
 
@@ -243,15 +265,26 @@ class HierarchicalMemory:
             similarity = cosine_similarity(embedding, knowledge_node.embedding)
             similarities.append([similarity, knowledge_node])
 
-        most_similar = max(similarities, key=lambda x: x[0])
-        knowledge_node = most_similar[1]
+        # Sort the similarities list in descending order based on similarity value
+        similarities.sort(key=lambda x: x[0], reverse=True)
 
-        if "<yes>" in self._llm_classification(summary_node, knowledge_node):
-            return knowledge_node
-        else:
-            return None
+        # Take the top n_nearest knowledge nodes
+        most_similar = similarities[:n_nearest]
 
-    def build_summary_node(self) -> None:
+        if len(most_similar) == 0:
+            return [None]
+
+        found_nodes = []
+        for similarity, knowledge_node in most_similar:
+            if "<yes>" in self._llm_classification(summary_node, knowledge_node):
+                found_nodes.append(knowledge_node)
+
+        if len(found_nodes) == 0:
+            return [None]
+
+        return found_nodes
+
+    def build_summary_node(self, n_nearest=3) -> None:
         """After a rolling window of X logs, we build a summary node that summarizes the logs"""
         summary_node = SummaryNode(self.logs)
         summary_node.generate_summary()
@@ -262,19 +295,63 @@ class HierarchicalMemory:
         # If there are no knowledge nodes, we create one with the summary node
         # If there are knowledge nodes, we check if the summary node is similar to any of them
         # If it is, we update the closest knowledge base article with the summary node
-        similar_knowledge_node = self._semantic_similarity(summary_node)
+        similar_knowledge_nodes = self._semantic_similarity(summary_node, n_nearest)
+        existing_topics = []
+        for node in similar_knowledge_nodes:
+            if node is not None:
+                node.summary_nodes.append(summary_node)
+                node.update_article(summary_node, node.topic)
+                logging.info(f"<updated knowledge node: {node.topic}>")
+                logging.info(f"<> {node.content} <>")
+                existing_topics.append(node.topic)
 
-        if similar_knowledge_node is not None:
-            similar_knowledge_node.summary_nodes.append(summary_node)
-            similar_knowledge_node.update_article(summary_node)
-            logging.info("<updated knowledge node>")
-            logging.info(f"<> {similar_knowledge_node.content} <>")
+        new_topics = self.create_new_topics(summary_node.content, existing_topics)
+        logging.info(f"<> New topics found: {new_topics} <>")
+        for topic in new_topics:
+            logging.info(f"<creating new knowledge node about {topic}>")
+            new_node = KnowledgeNode(summary_nodes=[summary_node])
+            new_node.generate_article(topic)
+            self.knowledge_nodes.append(new_node)
+
+    @chat_gpt_prompt
+    def _new_topics_prompt(self, summary, existing_topics):
+        topics_string = str(existing_topics).replace(',', ';')
+
+        prompt = f"INFORMATION:  {summary}, EXISTING TOPICS: {topics_string}\n\n"
+
+        prompt += (
+            f"TASK: Based on this INFORMATION create a list of new topics, that covers the part of the INFORMATION, that "
+            f"is not already covered by the EXISTING TOPICS. Use as few new topics as possible to cover all of the INFORMATION that "
+            f"is not covered by the existing topics. The name of a topic should be as concise as possible and capture the essence of the information that should be described."
+            f"Only add a topic, when meaningful information, regarding that topic is in the INFORMATION"
+            f"Return only the names of the topics separated by ';'. Structure your output like this: '[name1; name2; name3]'. "
+            f"If there are no new topics that would complement the EXISTING TOPICS, just return: '[no topic found]'"
+        )
+
+        return prompt
+
+    def create_new_topics(self, summary, existing_topics):
+        new_topics_string = self._new_topics_prompt(summary, existing_topics)
+        if "no topic found" in new_topics_string.lower():
+            return None
+
+        new_topics_string = new_topics_string.replace("'", "")
+        position = new_topics_string.find("[")
+        if position != -1:  # Check if the character is found
+            result = new_topics_string[position + 1:]
         else:
-            logging.info("<creating new knowledge node>")
-            knowledge_node = KnowledgeNode(summary_nodes=[summary_node])
-            knowledge_node.generate_article()
-            self.knowledge_nodes.append(knowledge_node)
-        # If it is not, we create a new knowledge base article with the summary node
+            result = new_topics_string
+
+        position = new_topics_string.find("]")
+        if position != -1:  # Check if the character is found
+            result = new_topics_string[:position]
+        else:
+            result = new_topics_string
+
+        new_topics = new_topics_string.split(";")
+
+        return new_topics
+
 
     def reindex_knowledge_nodes(self) -> None:
         """
