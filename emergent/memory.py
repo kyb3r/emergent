@@ -240,11 +240,11 @@ class HierarchicalMemory:
         a new knowledge node or an existing knowledge node.
         """
         prompt = (
-            f"Given the following summary:\n\n{summary_node.content}\n\n"
-            f"and the following knowledge base article:\n\n{knowledge_node.content}\n\n"
-            "Please classify whether the summary has relevant information that can be added to the knowledge base article.\n\n"
-            "If the summary is not related or relevant to the knowledge base article, please answer with `<no>`\n\n"
-            "If the summary is relevant to the knowledge base article, please answer with `<yes>`\n\n"
+            f"Given the following summary (X):\n\n{summary_node.content}\n\n"
+            f"and the following text (Y):\n\n{knowledge_node.content}\n\n"
+            "Please classify whether the summary is similar or distinct to the text. If Y has a title, please compare the summary to the title.\n\n"
+            "If the summary has a different/distinct topic to the provided text, please answer with `<no>`\n\n"
+            "If the summary is similar to the provided text, please answer with `<yes>`\n\n"
         )
 
         return prompt
