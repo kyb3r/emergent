@@ -1,6 +1,6 @@
-from agent import ChatAgent
+from emergent import ChatAgent, HierarchicalMemory
+
 import logging
-from memory import HierarchicalMemory
 from openai.embeddings_utils import get_embedding
 import config
 import openai
