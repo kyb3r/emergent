@@ -76,3 +76,21 @@ def chat_gpt_prompt(func):
         return response.choices[0].message.content
 
     return wrapper
+
+def chat_gpt_kshot(func):
+    """
+    A decorator that takes a function that returns a list of messages
+    It then sends that over to the chat completion api
+    """
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        messages = func(*args, **kwargs)
+        response = openai_chat_completion(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            temperature=0.5,
+        )
+        return response.choices[0].message.content
+
+    return wrapper
