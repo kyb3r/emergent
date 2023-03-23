@@ -1,12 +1,12 @@
 import logging
-from emergent import ChatAgent, HierarchicalMemory
+from emergent.agent import ChatAgent, HierarchicalMemory
 from openai.embeddings_utils import get_embedding
 import config
 import openai
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 openai.api_key = config.OPENAI_API_KEY # add your api key here
-memory_path = "memories.json"
+memory_path = "emergent-main/memories.json"
 
 try:
     memory = HierarchicalMemory.from_json(memory_path)
@@ -31,5 +31,4 @@ while True:
         agent.end_conversation(memory_path)
         break
 
-print(agent.messages)
 agent.end_conversation(memory_path)
