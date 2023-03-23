@@ -1,5 +1,5 @@
-from llms import openai_chat_completion
-from memory import HierarchicalMemory
+from .llms import openai_chat_completion
+from .memory import HierarchicalMemory
 
 
 class ChatAgent:
