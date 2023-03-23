@@ -137,8 +137,8 @@ class KnowledgeNode:
             "a person: 'Information about John', a concept: 'Derivatives in math' or a event '2024 presidential election (USA)'."
         )
 
-        prompt = f"ARTICLE: {self.content}\n\n"
-        prompt += (
+        prompt = (
+            f"ARTICLE: {self.content}\n\n"
             f"TASK: Based on this ARTICLE please write an heading for the ARTICLE. The heading should be informative and capture the essence of the content of the article."
             f"Only return the heading"
         )
@@ -146,7 +146,7 @@ class KnowledgeNode:
         return Prompt(system=system, prompt=prompt, model=self.model)
 
     def generate_topic(self):
-        self.topic = self.topic_prompt
+        self.topic = self.topic_prompt()
 
     @chat_gpt_prompt
     def _article_prompt(self, topic):
@@ -212,23 +212,25 @@ class KnowledgeNode:
     def to_dict(self) -> Dict:
         return {
             "id": str(self.id),
-            "summary_nodes": [cluster.to_dict() for cluster in self.summary_nodes],
+            "summary_nodes": [node.to_dict() for node in self.summary_nodes],
             "content": self.content,
             "embedding": self.embedding,
             "model": self.model,
+            "topic": self.topic,
         }
 
     @staticmethod
     def from_dict(data: Dict):
         summary_nodes = [
-            SummaryNode.from_dict(cluster_data)
-            for cluster_data in data["summary_nodes"]
+            SummaryNode.from_dict(node_data)
+            for node_data in data["summary_nodes"]
         ]
         knowledge_node = KnowledgeNode(summary_nodes=summary_nodes)
         knowledge_node.model = data.get("model", "gpt-3.5-turbo")
         knowledge_node.id = uuid.UUID(data["id"])
         knowledge_node.content = data["content"]
         knowledge_node.embedding = data["embedding"]
+        knowledge_node.topic = data["topic"]
         return knowledge_node
 
 class HierarchicalMemory:
@@ -362,7 +364,7 @@ class HierarchicalMemory:
     @chat_gpt_prompt
     def _new_topics_prompt(self, summary: str, existing_topics):
         existing_topics = [str(x) for x in existing_topics]
-        topics_string = "[" + "; ".join() + "]"
+        topics_string = "[" + "; ".join(existing_topics) + "]"
 
         system = (
             "You are topicGPT, based on INFORMATION create a list of new topics, that covers the part of the INFORMATION, that "
