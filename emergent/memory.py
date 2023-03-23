@@ -5,7 +5,7 @@ from datetime import datetime
 import json
 import logging
 from openai.embeddings_utils import cosine_similarity
-from llms import chat_gpt_prompt, get_embedding
+from .llms import chat_gpt_prompt, get_embedding
 
 
 class DateTimeEncoder(json.JSONEncoder):
@@ -139,7 +139,7 @@ class KnowledgeNode:
 
         prompt += (
             f"TASK: Based on this INFORMATION, extract all knowledge that regards the following topic: {topic},"
-            f"and write a short knwoledge article about that topic. Be sure to include each piece of knowledge, that directly relates to {topic} and was included in the INFORMATION."
+            f"and write a short knowledge article about that topic. Be sure to include each piece of knowledge, that directly relates to {topic} and was included in the INFORMATION."
             f"Don't add anything that was not included in the INFORMATION. Return only the knowledge article"
         )
 
