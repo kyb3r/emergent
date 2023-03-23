@@ -3,9 +3,8 @@ from typing import List, Dict
 from collections import defaultdict
 from datetime import datetime
 import json
-
+import logging
 from openai.embeddings_utils import cosine_similarity
-
 from .llms import chat_gpt_prompt, get_embedding
 
 
@@ -52,12 +51,13 @@ class SummaryNode:
     memory logs that are chronologically sequential.
     """
 
-    def __init__(self, logs: List[MemoryLog]):
+    def __init__(self, logs: List[MemoryLog], model="gpt-4"):
         self.id = uuid.uuid4()
         self.logs = logs
         self.content: str
         self.created_at = datetime.now()
         self.embedding = None
+        self.model = model
 
     @chat_gpt_prompt
     def _summary_prompt(self) -> str:
@@ -65,23 +65,22 @@ class SummaryNode:
         Generates a summary of the memory logs. ChatGPT executes the prompt
         returned by this method.
         """
+        system = "You are knowledgeGPT an AI, that extracts knowledge from chat logs. You just extract information regarding topics like people, concepts or events." \
+                 "Example conversation: USER: Hi, my name is John and I like artificial intelligence\n\n ASSISTANT: Hi John, why do you like artificial intelligence?\n\n USER:" \
+                 " Because recently (2023), AI has gotten a lot smarter, especially in nlp\n\n Example extract information: The user is John. " \
+                 "John likes AI, because it has gotten a lot smarter." \
+                 "The year is 2023 or shortly after. AI connected to natural language processing has gotten a lot smarter in 2023."
 
-        prompt = "The following is a conversation between you and the user:\n\n"
+        prompt = "The following is the conversation between the ASSISTANT and the USER:\n\n"
 
         for log in self.logs:
             prompt += f"{log.role.capitalize()}: {log.content}\n\n"
 
-        prompt += (
-            "Based on the above conversation, write a concise yet comprehensive "
-            "executive summary highlighting the most important and salient "
-            "information. Focus on essential details such as personal information, people, places, things, "
-            "concepts, events, and ideas discussed in the conversation. "
-            "Please ignore any unimportant dialogue or irrelevant information "
-            "that does not contribute to the salient parts of the conversation. "
-            "For example if a user talks about himself, make sure to include dot points about his details. Don't just say that `the use shared the information`, you must record it"
-        )
+        prompt += "TASK: Based on the above conversation, write a concise list of the information that was shared between the USER and the ASSISTANT." \
+                  "Include every piece of knowledge that was shared, regarding persons, concepts or events, do not add any information that did not come up in the conversation." \
+                  "Only return the summary."
 
-        return prompt
+        return system, prompt, self.model
 
     def generate_summary(self) -> str:
         """Generate a summary of the memory logs."""
@@ -114,45 +113,84 @@ class KnowledgeNode:
     or representation of a group of (clustered) summary nodes.
     """
 
-    def __init__(self, summary_nodes: List[SummaryNode]):
+    def __init__(self, summary_nodes: List[SummaryNode], model="gpt-4"):
         self.id = uuid.uuid4()
         self.summary_nodes = summary_nodes
+        self.topic = None
         self.content: str
         self.embedding = None
+        self.model = model
 
     @chat_gpt_prompt
-    def _article_prompt(self):
+    def topic_prompt(self):
+        system = "You are headingGPT, you write short informative headings for knowledge ARTICLES. Examples for headings if the article is about" \
+                 "a person: 'Information about John', a concept: 'Derivatives in math' or a event '2024 presidential election (USA)'."
+
+        prompt = f"ARTICLE: {self.content}"
+        prompt += (
+            f"TASK: Based on this ARTICLE please write an heading for the ARTICLE. The heading should be informative and capture the essence of the content of the article."
+            f"Only return the heading"
+        )
+        return system, prompt, self.model
+
+    def generate_topic(self):
+        self.topic = self.topic_prompt
+
+    @chat_gpt_prompt
+    def _article_prompt(self, topic):
         """
-        Generates a knowledge base article based on the summary nodes. ChatGPT
+        Generates a knowledge base article based on the summary nodes, and the topic provided. ChatGPT
         executes the prompt returned by this method.
         """
+        system = "You are knowledgeGPT, you generate knowledge base articles regarding a specific topic. Here an example: " \
+                 "INFORMATION: 'The user is John. John likes AI, because it has gotten a lot smarter." \
+                 "The year is 2023 or shortly after. AI connected to natural language processing has gotten a lot smarter in 2023.' " \
+                 "topic: 'Artificial intelligence' knowledge article: 'There are different fields related to AI. AI connected" \
+                 "to natural language processing (nlp), has gotten a lot smarter in 2023. Some people like AI.'"
 
-        prompt = "The following is a collection of summaries of chat logs:\n\n"
+        prompt = "INFORMATION: "
 
         for index, summary_node in enumerate(self.summary_nodes):
-            prompt += f"{index+1}. {summary_node.content}\n\n"
+            prompt += f"{index + 1}. {summary_node.content}\n\n"
 
         prompt += (
-            "Write a concise summary about the most important details that you can extract from the summary"
-            "You must have a title that represent the topic of the article. "
-            "The title should categorise this summary as either related to "
-            "A person or name, Places, Things, Events, or Concepts. \n"
-            "An example title would be: 'Personal information about the user' and the body would contain important details "
+            f"TASK: Based on this INFORMATION, extract all knowledge that regards the following topic: {topic},"
+            f"and write a short knwoledge article about that topic. Be sure to include each piece of knowledge, that directly relates to {topic} and was included in the INFORMATION."
+            f"Don't add anything that was not included in the INFORMATION. Return only the knowledge article"
         )
 
-        return prompt
+        return system, prompt, self.model
 
-    def _update_article_prompt(self, new_summary_node):
-        # TODO: make a more advanced version of this
-        return self._article_prompt()
+    @chat_gpt_prompt
+    def _update_article_prompt(self, new_summary_node, topic):
+        system = "You are knowledgeGPT, you update knowledge base articles regarding a specific topic. Here an example: " \
+                 "INFORMATION: 'The user is John. John loves playing tennis. The next presidential election in the USA will happen next year." \
+                 "The year is 2023 or shortly after. GPT-4 was released, a transformer in the nlp domain, that greatly advanced the field' " \
+                 "topic: 'Artificial intelligence' old knowledge article: 'There are different fields related to AI. AI connected" \
+                 "to natural language processing (nlp), has gotten a lot smarter in 2023. This could be due to the release of GPT-4 a transformer model " \
+                 "in the nlp domain, that advanced the field. Some people like AI.' updated article:" \
+                 "'There are different fields related to AI. AI connected" \
+                 "to natural language processing (nlp), has gotten a lot smarter in 2023. Some people like AI.'"
 
-    def generate_article(self) -> str:
-        self.content = self._article_prompt()
-        print("<>", self.content, "<>")
+        prompt = f"ARTICLE: {self.content}"
+
+        prompt += f"NEW INFORMATION:  {new_summary_node}\n\n"
+
+        prompt += (
+            f"TASK: Based on this NEW INFORMATION, update the ARTICLE with all information that regards the following topic: {topic}. "
+            f"Be sure to include each piece of knowledge, that directly relates to {topic} and was included in the NEW INFORMATION or the ARTICLE."
+            f"Don't add anything that was not included in the NEW INFORMATION or the ARTICLE. Return only the updated article"
+        )
+
+        return system, prompt, self.model
+
+    def generate_article(self, topic):
+        self.content = self._article_prompt(topic)
+        logging.info(f"<>{self.content}<>")
         self.embedding = get_embedding(self.content)
 
-    def update_article(self, summary_node):
-        self.content = self._update_article_prompt(summary_node)
+    def update_article(self, summary_node, topic):
+        self.content = self._update_article_prompt(summary_node, topic)
         self.embedding = get_embedding(self.content)
 
     def to_dict(self) -> Dict:
@@ -194,11 +232,12 @@ class HierarchicalMemory:
     ]
     """
 
-    def __init__(self):
+    def __init__(self, model="gpt-4"):
         self.logs: list = []
         self.summary_nodes: list = []
         self.knowledge_nodes: list = []
-        self.rolling_window_size = 10
+        self.rolling_window_size = 20
+        self.model = model
 
     def query(self, query: str) -> KnowledgeNode:
         """
@@ -226,23 +265,25 @@ class HierarchicalMemory:
         This method is responsible for classifying a summary node as either
         a new knowledge node or an existing knowledge node.
         """
+        system = "You are a decision module that determines if information relevant to a topic is present in an article"
+
         prompt = (
-            f"Given the following summary (X):\n\n{summary_node.content}\n\n"
-            f"and the following text (Y):\n\n{knowledge_node.content}\n\n"
-            "Please classify whether the summary is similar or distinct to the text. If Y has a title, please compare the summary to the title.\n\n"
-            "If the summary has a different/distinct topic to the provided text, please answer with `<no>`\n\n"
-            "If the summary is similar to the provided text, please answer with `<yes>`\n\n"
+            f"Given the following summary:\n\n{summary_node.content}\n\n"
+            f"and the following knowledge base article:\n\n{knowledge_node.content}\n\n"
+            "Please classify whether the summary has relevant information that can be added to the knowledge base article.\n\n"
+            "If the summary is not related or relevant to the knowledge base article, please answer with `<no>`\n\n"
+            "If the summary is relevant to the knowledge base article, please answer with `<yes>`\n\n"
         )
 
-        return prompt
+        return system, prompt, self.model
 
-    def _semantic_similarity(self, summary_node):
+    def _semantic_similarity(self, summary_node, n_nearest=1):
         """
-        This method is responsible for calculating the semantic similarity
-        between a summary node and the knowledge nodes.
+        This method is responsible for calculating the semantic similarity between a summary node and the knowledge nodes.
+        The method returns the n_nearest knowledge nodes to the summary node in embedding space
         """
         if len(self.knowledge_nodes) == 0:
-            return None
+            return [None]
 
         embedding = summary_node.embedding
 
@@ -252,40 +293,91 @@ class HierarchicalMemory:
             similarity = cosine_similarity(embedding, knowledge_node.embedding)
             similarities.append([similarity, knowledge_node])
 
-        most_similar = max(similarities, key=lambda x: x[0])
-        knowledge_node = most_similar[1]
+        # Sort the similarities list in descending order based on similarity value
+        similarities.sort(key=lambda x: x[0], reverse=True)
 
-        classification = self._llm_classification(summary_node, knowledge_node)
-        print(classification)
-        if "<yes>" in classification:
-            return knowledge_node
-        else:
-            return None
+        # Take the top n_nearest knowledge nodes
+        most_similar = similarities[:n_nearest]
 
-    def build_summary_node(self) -> None:
+        if len(most_similar) == 0:
+            return [None]
+
+        found_nodes = []
+        for similarity, knowledge_node in most_similar:
+            if "<yes>" in self._llm_classification(summary_node, knowledge_node):
+                found_nodes.append(knowledge_node)
+
+        if len(found_nodes) == 0:
+            return [None]
+
+        return found_nodes
+
+    def build_summary_node(self, n_nearest=3) -> None:
         """After a rolling window of X logs, we build a summary node that summarizes the logs"""
         summary_node = SummaryNode(self.logs)
         summary_node.generate_summary()
-        print("<created summary node>")
+        logging.info("<created summary node>")
         self.summary_nodes.append(summary_node)
         self.logs = []
 
         # If there are no knowledge nodes, we create one with the summary node
         # If there are knowledge nodes, we check if the summary node is similar to any of them
         # If it is, we update the closest knowledge base article with the summary node
-        similar_knowledge_node = self._semantic_similarity(summary_node)
+        similar_knowledge_nodes = self._semantic_similarity(summary_node, n_nearest)
+        existing_topics = []
+        for node in similar_knowledge_nodes:
+            if node is not None:
+                node.summary_nodes.append(summary_node)
+                node.update_article(summary_node, node.topic)
+                logging.info(f"<updated knowledge node: {node.topic}>")
+                logging.info(f"<> {node.content} <>")
+                existing_topics.append(node.topic)
 
-        if similar_knowledge_node is not None:
-            similar_knowledge_node.summary_nodes.append(summary_node)
-            similar_knowledge_node.update_article(summary_node)
-            print("<updated knowledge node>")
-            print("<>", similar_knowledge_node.content, "<>")
-        else:
-            print("<creating new knowledge node>")
-            knowledge_node = KnowledgeNode(summary_nodes=[summary_node])
-            knowledge_node.generate_article()
-            self.knowledge_nodes.append(knowledge_node)
-        # If it is not, we create a new knowledge base article with the summary node
+        new_topics = self.create_new_topics(summary_node.content, existing_topics)
+        logging.info(f"<> New topics found: {new_topics} <>")
+        for topic in new_topics:
+            logging.info(f"<creating new knowledge node about {topic}>")
+            new_node = KnowledgeNode(summary_nodes=[summary_node])
+            new_node.generate_article(topic)
+            new_node.topic = topic
+            self.knowledge_nodes.append(new_node)
+
+    @chat_gpt_prompt
+    def _new_topics_prompt(self, summary, existing_topics):
+        topics_string = str(existing_topics).replace(',', ';')
+
+        system = (
+            "You are topicGPT, based on INFORMATION create a list of new topics, that covers the part of the INFORMATION, that "
+            f"is not already covered by the EXISTING TOPICS. Here an example: "
+            "INFORMATION: The user is John. John loves playing tennis. The next presidential election in the USA will happen next year."
+            "The year is 2023 or shortly after. GPT-4 was released, a transformer in the nlp domain, that greatly advanced the field"
+            "EXISTING TOPICS: [John; Artificial intelligence] new topics: [Presidential election (USA)]")
+
+        prompt = f"INFORMATION:  {summary}, EXISTING TOPICS: {topics_string}\n\n"
+
+        prompt += (
+            f"TASK: Based on this INFORMATION create a list of new topics, that covers the part of the INFORMATION, that "
+            f"is not already covered by the EXISTING TOPICS. Use as few new topics as possible to cover all of the INFORMATION that "
+            f"is not covered by the existing topics. The name of a topic should be as concise as possible and capture the essence of the information that should be described."
+            f"Only add a topic, when meaningful information, regarding that topic is in the INFORMATION"
+            f"Return only the names of the new topics separated by ';'. Structure your output like this: [name1; name2; name3]. "
+            f"If there are no new topics that would complement the EXISTING TOPICS, just return: [no topic found]"
+        )
+
+        return system, prompt, self.model
+
+    def create_new_topics(self, summary, existing_topics):
+        new_topics_string = self._new_topics_prompt(summary, existing_topics)
+        if "no topic found" in new_topics_string.lower():
+            return None
+
+        new_topics_string = new_topics_string.replace("'", "")
+        new_topics_string.replace("[", "")
+        new_topics_string.replace("]", "")
+
+        new_topics = new_topics_string.split(";")
+
+        return new_topics
 
     def reindex_knowledge_nodes(self) -> None:
         """
@@ -308,20 +400,20 @@ class HierarchicalMemory:
             indent=4,
             cls=DateTimeEncoder,
         )
-    
+
     @classmethod
     def from_json(cls, path: str):
         with open(path) as f:
             data = json.load(f)
 
         memory = cls()
-        memory.logs = [MemoryLog.from_dict(log_data) for log_data in data.get("logs", [])]
+        memory.logs = [MemoryLog.from_dict(log_data) for log_data in data["logs"]]
         memory.summary_nodes = [
             SummaryNode.from_dict(summary_node_data)
-            for summary_node_data in data.get("summary_nodes", [])
+            for summary_node_data in data["summary_nodes"]
         ]
         memory.knowledge_nodes = [
             KnowledgeNode.from_dict(knowledge_node_data)
-            for knowledge_node_data in data.get("knowledge_nodes", [])
+            for knowledge_node_data in data["knowledge_nodes"]
         ]
         return memory
