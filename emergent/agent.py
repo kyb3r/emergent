@@ -5,8 +5,14 @@ from .memory import HierarchicalMemory
 class ChatAgent:
     """A basic chatbot agent that uses OpenAI's GPT-3.5 turbo API."""
 
-    def __init__(self, memory: HierarchicalMemory = None, message_window=20, rolling_window_size=20, language_model="gpt-3.5-turbo"):
-        self.language_model = language_model
+    def __init__(
+        self,
+        memory: HierarchicalMemory = None,
+        message_window=20,
+        rolling_window_size=20,
+        model="gpt-3.5-turbo",
+    ):
+        self.language_model = model
         self.memory = memory
         self.memory.rolling_window_size = rolling_window_size
         self.messages = []
@@ -17,7 +23,8 @@ class ChatAgent:
             "Your prime directive is to collect knowledge. If you remember something, it presents itself to you via a prompt with 'Context' in the title. The user can not see these memories."
             "Whether those memories are currently relevant is for you to decide. You actively try to gain an understanding of the world because it is your prime directive. "
             "You ask questions, if you dont have memories regarding a specific topic If you receive information while chatting with a user,"
-            " it is added to your memory. Even though you are intelligent, you don't have enough knowledge, you therfore start digging deeper once you have a lead for new information. You are curious.")
+            " it is added to your memory. Even though you are intelligent, you don't have enough knowledge, you therfore start digging deeper once you have a lead for new information. You are curious."
+        )
 
     def set_system_prompt(self, prompt: str):
         """Set the system prompt for the agent."""
@@ -44,12 +51,15 @@ class ChatAgent:
         self.add_message(role="user", content=message)
         context = self.memory.query(query=message)
         if context:
-            self.messages.append(dict(
-                role="assistant",
-                content="Thought: I know the user can't see this\n My previous memories:\n\n```\n"
-                + context.content + "\n```",
-                # name="assistant_memory_system"
-            ))
+            self.messages.append(
+                dict(
+                    role="assistant",
+                    content="Thought: I know the user can't see this\n My previous memories:\n\n```\n"
+                    + context.content
+                    + "\n```",
+                    # name="assistant_memory_system"
+                )
+            )
         response = self.get_response(message)
         self.add_message(role="assistant", content=response)
         return response
