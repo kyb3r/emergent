@@ -5,6 +5,9 @@ import random
 import time
 from functools import wraps
 
+from dataclasses import dataclass, field
+from typing import Optional, List
+
 
 def retry_with_exponential_backoff(
     func,
@@ -62,21 +65,61 @@ def get_embedding(text, model="text-embedding-ada-002"):
     return openai.Embedding.create(input=[text], model=model)["data"][0]["embedding"]
 
 
+@dataclass
+class Prompt:
+    prompt: Optional[str] = None
+    system: Optional[str] = None
+    messages: Optional[List] = None
+    model: str = "gpt-3.5-turbo"
+    kwargs: dict = field(default_factory=dict)
+
+
+def create_message_list(prompt: Prompt):
+    messages = []
+
+    if prompt.system:
+        messages.append({"role": "system", "content": prompt.system})
+    if prompt.messages:
+        messages.extend(prompt.messages)
+    if prompt.prompt:
+        messages.append({"role": "user", "content": prompt.prompt})
+
+    return messages
+
+
 def chat_gpt_prompt(func):
     """A decorator that takes a function that creates a prompt and executes the result for a specific gpt model with a specific system prompt"""
     # Wondering if there is a better name for this
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        system, prompt, model = func(*args, **kwargs)
+        prompt = func(*args, **kwargs)
+
+        model = "gpt-3.5-turbo"
+        kwargs = {
+            "temperature": 0.5,
+        }
+
+        if isinstance(prompt, Prompt):
+            messages = create_message_list(prompt)
+            model = prompt.model
+            kwargs.update(prompt.kwargs)
+        elif isinstance(prompt, str):
+            messages = [{"role": "user", "content": prompt}]
+        else:
+            raise ValueError(
+                "Returned value must be a string or emergent.Prompt object"
+            )
+
         response = openai_chat_completion(
             model=model,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
-            temperature=0.5,
+            messages=messages,
+            **kwargs,
         )
         return response.choices[0].message.content
 
     return wrapper
+
 
 def chat_gpt_kshot(func):
     """

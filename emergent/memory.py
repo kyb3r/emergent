@@ -5,7 +5,8 @@ from datetime import datetime
 import json
 import logging
 from openai.embeddings_utils import cosine_similarity
-from .llms import chat_gpt_prompt, get_embedding
+
+from .llms import chat_gpt_prompt, get_embedding, Prompt
 
 
 class DateTimeEncoder(json.JSONEncoder):
@@ -51,7 +52,7 @@ class SummaryNode:
     memory logs that are chronologically sequential.
     """
 
-    def __init__(self, logs: List[MemoryLog], model="gpt-4"):
+    def __init__(self, logs: List[MemoryLog], model="gpt-3.5-turbo"):
         self.id = uuid.uuid4()
         self.logs = logs
         self.content: str
@@ -65,22 +66,28 @@ class SummaryNode:
         Generates a summary of the memory logs. ChatGPT executes the prompt
         returned by this method.
         """
-        system = "You are knowledgeGPT an AI, that extracts knowledge from chat logs. You just extract information regarding topics like people, concepts or events." \
-                 "Example conversation: USER: Hi, my name is John and I like artificial intelligence\n\n ASSISTANT: Hi John, why do you like artificial intelligence?\n\n USER:" \
-                 " Because recently (2023), AI has gotten a lot smarter, especially in nlp\n\n Example extract information: The user is John. " \
-                 "John likes AI, because it has gotten a lot smarter." \
-                 "The year is 2023 or shortly after. AI connected to natural language processing has gotten a lot smarter in 2023."
+        system = (
+            "You are knowledgeGPT an AI, that extracts knowledge from chat logs. You just extract information regarding topics like people, concepts or events."
+            "Example conversation: USER: Hi, my name is John and I like artificial intelligence\n\n ASSISTANT: Hi John, why do you like artificial intelligence?\n\n USER:"
+            " Because recently (2023), AI has gotten a lot smarter, especially in nlp\n\n Example extract information: The user is John. "
+            "John likes AI, because it has gotten a lot smarter."
+            "The year is 2023 or shortly after. AI connected to natural language processing has gotten a lot smarter in 2023."
+        )
 
-        prompt = "The following is the conversation between the ASSISTANT and the USER:\n\n"
+        prompt = (
+            "The following is the conversation between the ASSISTANT and the USER:\n\n"
+        )
 
         for log in self.logs:
             prompt += f"{log.role.capitalize()}: {log.content}\n\n"
 
-        prompt += "TASK: Based on the above conversation, write a concise list of the information that was shared between the USER and the ASSISTANT." \
-                  "Include every piece of knowledge that was shared, regarding persons, concepts or events, do not add any information that did not come up in the conversation." \
-                  "Only return the summary."
+        prompt += (
+            "TASK: Based on the above conversation, write a concise list of the information that was shared between the USER and the ASSISTANT."
+            "Include every piece of knowledge that was shared, regarding persons, concepts or events, do not add any information that did not come up in the conversation."
+            "Only return the summary."
+        )
 
-        return system, prompt, self.model
+        return Prompt(system=system, prompt=prompt, model=self.model)
 
     def generate_summary(self) -> str:
         """Generate a summary of the memory logs."""
@@ -94,12 +101,14 @@ class SummaryNode:
             "content": self.content,
             "embedding": self.embedding,
             "created_at": self.created_at,
+            "model": self.model,
         }
 
     @staticmethod
     def from_dict(data: Dict):
         logs = [MemoryLog.from_dict(log_data) for log_data in data["logs"]]
         summary_node = SummaryNode(logs=logs)
+        summary_node.model = data.get("model", "gpt-3.5-turbo")
         summary_node.id = uuid.UUID(data["id"])
         summary_node.content = data["content"]
         summary_node.created_at = data["created_at"]
@@ -113,7 +122,7 @@ class KnowledgeNode:
     or representation of a group of (clustered) summary nodes.
     """
 
-    def __init__(self, summary_nodes: List[SummaryNode], model="gpt-4"):
+    def __init__(self, summary_nodes: List[SummaryNode], model="gpt-3.5-turbo"):
         self.id = uuid.uuid4()
         self.summary_nodes = summary_nodes
         self.topic = None
@@ -123,15 +132,18 @@ class KnowledgeNode:
 
     @chat_gpt_prompt
     def topic_prompt(self):
-        system = "You are headingGPT, you write short informative headings for knowledge ARTICLES. Examples for headings if the article is about" \
-                 "a person: 'Information about John', a concept: 'Derivatives in math' or a event '2024 presidential election (USA)'."
+        system = (
+            "You are headingGPT, you write short informative headings for knowledge ARTICLES. Examples for headings if the article is about"
+            "a person: 'Information about John', a concept: 'Derivatives in math' or a event '2024 presidential election (USA)'."
+        )
 
-        prompt = f"ARTICLE: {self.content}"
+        prompt = f"ARTICLE: {self.content}\n\n"
         prompt += (
             f"TASK: Based on this ARTICLE please write an heading for the ARTICLE. The heading should be informative and capture the essence of the content of the article."
             f"Only return the heading"
         )
-        return system, prompt, self.model
+
+        return Prompt(system=system, prompt=prompt, model=self.model)
 
     def generate_topic(self):
         self.topic = self.topic_prompt
@@ -142,11 +154,13 @@ class KnowledgeNode:
         Generates a knowledge base article based on the summary nodes, and the topic provided. ChatGPT
         executes the prompt returned by this method.
         """
-        system = "You are knowledgeGPT, you generate knowledge base articles regarding a specific topic. Here an example: " \
-                 "INFORMATION: 'The user is John. John likes AI, because it has gotten a lot smarter." \
-                 "The year is 2023 or shortly after. AI connected to natural language processing has gotten a lot smarter in 2023.' " \
-                 "topic: 'Artificial intelligence' knowledge article: 'There are different fields related to AI. AI connected" \
-                 "to natural language processing (nlp), has gotten a lot smarter in 2023. Some people like AI.'"
+        system = (
+            "You are knowledgeGPT, you generate knowledge base articles regarding a specific topic. Here an example: "
+            "INFORMATION: 'The user is John. John likes AI, because it has gotten a lot smarter."
+            "The year is 2023 or shortly after. AI connected to natural language processing has gotten a lot smarter in 2023.' "
+            "topic: 'Artificial intelligence' knowledge article: 'There are different fields related to AI. AI connected"
+            "to natural language processing (nlp), has gotten a lot smarter in 2023. Some people like AI.'"
+        )
 
         prompt = "INFORMATION: "
 
@@ -159,22 +173,24 @@ class KnowledgeNode:
             f"Don't add anything that was not included in the INFORMATION. Return only the knowledge article"
         )
 
-        return system, prompt, self.model
+        return Prompt(system=system, prompt=prompt, model=self.model)
 
     @chat_gpt_prompt
     def _update_article_prompt(self, new_summary_node, topic):
-        system = "You are knowledgeGPT, you update knowledge base articles regarding a specific topic. Here an example: " \
-                 "INFORMATION: 'The user is John. John loves playing tennis. The next presidential election in the USA will happen next year." \
-                 "The year is 2023 or shortly after. GPT-4 was released, a transformer in the nlp domain, that greatly advanced the field' " \
-                 "topic: 'Artificial intelligence' old knowledge article: 'There are different fields related to AI. AI connected" \
-                 "to natural language processing (nlp), has gotten a lot smarter in 2023. This could be due to the release of GPT-4 a transformer model " \
-                 "in the nlp domain, that advanced the field. Some people like AI.' updated article:" \
-                 "'There are different fields related to AI. AI connected" \
-                 "to natural language processing (nlp), has gotten a lot smarter in 2023. Some people like AI.'"
+        system = (
+            "You are knowledgeGPT, you update knowledge base articles regarding a specific topic. Here an example: "
+            "INFORMATION: 'The user is John. John loves playing tennis. The next presidential election in the USA will happen next year."
+            "The year is 2023 or shortly after. GPT-4 was released, a transformer in the nlp domain, that greatly advanced the field' "
+            "topic: 'Artificial intelligence' old knowledge article: 'There are different fields related to AI. AI connected"
+            "to natural language processing (nlp), has gotten a lot smarter in 2023. This could be due to the release of GPT-4 a transformer model "
+            "in the nlp domain, that advanced the field. Some people like AI.' updated article:"
+            "'There are different fields related to AI. AI connected"
+            "to natural language processing (nlp), has gotten a lot smarter in 2023. Some people like AI.'"
+        )
 
         prompt = f"ARTICLE: {self.content}"
 
-        prompt += f"NEW INFORMATION:  {new_summary_node}\n\n"
+        prompt += f"NEW INFORMATION:  {new_summary_node.content}\n\n"
 
         prompt += (
             f"TASK: Based on this NEW INFORMATION, update the ARTICLE with all information that regards the following topic: {topic}. "
@@ -182,7 +198,7 @@ class KnowledgeNode:
             f"Don't add anything that was not included in the NEW INFORMATION or the ARTICLE. Return only the updated article"
         )
 
-        return system, prompt, self.model
+        return Prompt(system=system, prompt=prompt, model=self.model)
 
     def generate_article(self, topic):
         self.content = self._article_prompt(topic)
@@ -199,6 +215,7 @@ class KnowledgeNode:
             "summary_nodes": [cluster.to_dict() for cluster in self.summary_nodes],
             "content": self.content,
             "embedding": self.embedding,
+            "model": self.model,
         }
 
     @staticmethod
@@ -208,11 +225,11 @@ class KnowledgeNode:
             for cluster_data in data["summary_nodes"]
         ]
         knowledge_node = KnowledgeNode(summary_nodes=summary_nodes)
+        knowledge_node.model = data.get("model", "gpt-3.5-turbo")
         knowledge_node.id = uuid.UUID(data["id"])
         knowledge_node.content = data["content"]
         knowledge_node.embedding = data["embedding"]
         return knowledge_node
-
 
 class HierarchicalMemory:
     """
@@ -232,7 +249,7 @@ class HierarchicalMemory:
     ]
     """
 
-    def __init__(self, model="gpt-4"):
+    def __init__(self, model="gpt-3.5-turbo"):
         self.logs: list = []
         self.summary_nodes: list = []
         self.knowledge_nodes: list = []
@@ -275,7 +292,7 @@ class HierarchicalMemory:
             "If the summary is relevant to the knowledge base article, please answer with `<yes>`\n\n"
         )
 
-        return system, prompt, self.model
+        return Prompt(system=system, prompt=prompt, model=self.model)
 
     def _semantic_similarity(self, summary_node, n_nearest=1):
         """
@@ -314,7 +331,7 @@ class HierarchicalMemory:
 
     def build_summary_node(self, n_nearest=3) -> None:
         """After a rolling window of X logs, we build a summary node that summarizes the logs"""
-        summary_node = SummaryNode(self.logs)
+        summary_node = SummaryNode(self.logs, model=self.model)
         summary_node.generate_summary()
         logging.info("<created summary node>")
         self.summary_nodes.append(summary_node)
@@ -337,21 +354,23 @@ class HierarchicalMemory:
         logging.info(f"<> New topics found: {new_topics} <>")
         for topic in new_topics:
             logging.info(f"<creating new knowledge node about {topic}>")
-            new_node = KnowledgeNode(summary_nodes=[summary_node])
+            new_node = KnowledgeNode(summary_nodes=[summary_node], model=self.model)
             new_node.generate_article(topic)
             new_node.topic = topic
             self.knowledge_nodes.append(new_node)
 
     @chat_gpt_prompt
-    def _new_topics_prompt(self, summary, existing_topics):
-        topics_string = str(existing_topics).replace(',', ';')
+    def _new_topics_prompt(self, summary: str, existing_topics):
+        existing_topics = [str(x) for x in existing_topics]
+        topics_string = "[" + "; ".join() + "]"
 
         system = (
             "You are topicGPT, based on INFORMATION create a list of new topics, that covers the part of the INFORMATION, that "
             f"is not already covered by the EXISTING TOPICS. Here an example: "
             "INFORMATION: The user is John. John loves playing tennis. The next presidential election in the USA will happen next year."
             "The year is 2023 or shortly after. GPT-4 was released, a transformer in the nlp domain, that greatly advanced the field"
-            "EXISTING TOPICS: [John; Artificial intelligence] new topics: [Presidential election (USA)]")
+            "EXISTING TOPICS: [John; Artificial intelligence] new topics: [Presidential election (USA)]"
+        )
 
         prompt = f"INFORMATION:  {summary}, EXISTING TOPICS: {topics_string}\n\n"
 
@@ -364,9 +383,9 @@ class HierarchicalMemory:
             f"If there are no new topics that would complement the EXISTING TOPICS, just return: [no topic found]"
         )
 
-        return system, prompt, self.model
+        return Prompt(system=system, prompt=prompt, model=self.model)
 
-    def create_new_topics(self, summary, existing_topics):
+    def create_new_topics(self, summary: str, existing_topics: list):
         new_topics_string = self._new_topics_prompt(summary, existing_topics)
         if "no topic found" in new_topics_string.lower():
             return None
