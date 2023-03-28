@@ -26,23 +26,15 @@ class ToolManager:
         self.agent = agent
         self.tools = agent.tools
 
-    def format_tool_usage(self):
-        if not self.tools:
-            return "No tools available."
-        msg = "Below is a list of tools you can use (ensure your payload is always in JSON format):\n\n"
-        for i, tool in enumerate(self.tools):
-            msg += f"{i+1}. `{tool.schema.name}(json)` - {tool.schema.description}\n\n"
-            msg += "Example usage:\n"
-            msg += tool.schema.usage + "\n\n\n"
-        return msg
-
     def handle_message(self, content):
         """
         Process a message from the agent. If the message contains a tool call,
         process it and return the LLM's response to the tool.
         """
 
-        print(content)
+        # Keep executing tools in a chain until the agent stops calling them
+        # TODO: add a timeout/max tries to prevent infinite loops
+
         while (match := self.parse_tools(content)) is not None:
             tool, kwargs, matched_string = match
             print("FUNCTION CALL: ", tool.schema.name, kwargs)
@@ -103,6 +95,15 @@ class ToolManager:
             logging.error(f"Error decoding JSON: {match.group(1)}")
             return e
 
+    def format_tool_usage(self):
+        if not self.tools:
+            return "No tools available."
+        msg = "Below is a list of tools you can use (ensure your payload is always in JSON format):\n\n"
+        for i, tool in enumerate(self.tools):
+            msg += f"{i+1}. `{tool.schema.name}(json)` - {tool.schema.description}\n\n"
+            msg += "Example usage:\n"
+            msg += tool.schema.usage + "\n\n\n"
+        return msg
 
 class ChatAgent:
     """A basic chatbot agent that uses OpenAI's GPT-3.5 turbo API."""
