@@ -1,6 +1,38 @@
 # Emergent
 
-Emergent is an implementation of the Hierarchical Memory Consolidation System ([HMCS](https://github.com/daveshap/HierarchicalMemoryConsolidationSystem)) for large language models like ChatGPT. HMCS aims to mimic human-like memory organization and recall, enabling efficient storage and retrieval of information while adapting to growing data.
+Emergent is a library designed to enhance Large Language Models (LLMs) like GPT-4 by providing easy integration of external tools and long-term memory capabilities. With Emergent, you can effortlessly transform any Python function into a tool that LLMs can utilize. The library also includes a built-in implementation of a long-term memory system called called [HMCS](https://github.com/daveshap/HierarchicalMemoryConsolidationSystem) which seeks to emulate human-like memory organization and recall.
+
+# Usage
+
+Making your own tools
+
+```python
+import emergent
+from emergent import ChatAgent
+
+@emergent.tool()
+def search(query):
+    """This tool is useful for searching through the company's documents."""
+    ...
+    return "Results: ..."
+   
+agent = ChatAgent(tools=[search])
+response = agent.send("What is the company's policy on remote work?")
+    
+```
+
+Using the long-term memory system
+
+```python
+from emergent import ChatAgent, HierarchicalMemory
+
+memory = HierarchicalMemory.from_json("memories.json")
+agent = ChatAgent(memory=memory)
+
+response = agent.send("What is my birthday?")
+```
+
+
 
 # Overview
 
@@ -20,21 +52,11 @@ This project tries to implement this system, here's the progress so far.
 - [x] Log based memory
 - [x] Rollup summaries 
 - [x] KB articles, automatically create or update existing KB articles
-- [x] Clustering, or gating functions (We use an LLM to make a classifcation whether or not a summary is relevant to the KB article as a gating function)
+- [x] Clustering, or gating functions
 - [ ] Scalability
 - [ ] Periodic reindexing
 
 
-# Usage
-
-```python
-from emergent import ChatAgent, HierarchicalMemory
-
-memory = HierarchicalMemory.from_json("memories.json")
-agent = ChatAgent(memory=memory)
-
-response = agent.send("What is my birthday?")
-```
 
 # Example conversation
 
