@@ -1,3 +1,4 @@
+from typing import Optional, List
 from .llms import openai_chat_completion
 from .memory import HierarchicalMemory
 
@@ -8,6 +9,7 @@ class ChatAgent:
     def __init__(
         self,
         memory: HierarchicalMemory = None,
+        tools: Optional[List] = None,
         message_window=20,
         rolling_window_size=20,
         model="gpt-3.5-turbo",
@@ -49,17 +51,18 @@ class ChatAgent:
     def send(self, message) -> str:
         """Send a message to the agent. While also managing chat history."""
         self.add_message(role="user", content=message)
-        context = self.memory.query(query=message)
-        if context:
-            self.messages.append(
-                dict(
-                    role="assistant",
-                    content="Thought: I know the user can't see this\n My previous memories:\n\n```\n"
-                    + context.content
-                    + "\n```",
-                    # name="assistant_memory_system"
+        if self.memory is not None:
+            context = self.memory.query(query=message)
+            if context:
+                self.messages.append(
+                    dict(
+                        role="assistant",
+                        content="Thought: I know the user can't see this\n My previous memories:\n\n```\n"
+                        + context.content
+                        + "\n```",
+                        # name="assistant_memory_system"
+                    )
                 )
-            )
         response = self.get_response(message)
         self.add_message(role="assistant", content=response)
         return response
