@@ -222,8 +222,7 @@ class KnowledgeNode:
     @staticmethod
     def from_dict(data: Dict):
         summary_nodes = [
-            SummaryNode.from_dict(node_data)
-            for node_data in data["summary_nodes"]
+            SummaryNode.from_dict(node_data) for node_data in data["summary_nodes"]
         ]
         knowledge_node = KnowledgeNode(summary_nodes=summary_nodes)
         knowledge_node.model = data.get("model", "gpt-3.5-turbo")
@@ -232,6 +231,7 @@ class KnowledgeNode:
         knowledge_node.embedding = data["embedding"]
         knowledge_node.topic = data["topic"]
         return knowledge_node
+
 
 class HierarchicalMemory:
     """

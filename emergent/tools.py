@@ -3,6 +3,20 @@ import functools
 import inspect
 import json
 
+example_messages = [
+    {
+        "role": "user",
+        "content": "[Example question from the user that might require memory access]",
+        "name": "example_user",
+    },
+    {
+        "role": "assistant",
+        "content": 'search_memory({"query": "foobar"})\n-> [results from the tool]',
+        "name": "example_assistant",
+    },
+]
+
+
 def tool(
     name: str = None,
     desc: str = None,
@@ -24,7 +38,6 @@ def tool(
             tool_name = func.__name__
         if tool_desc is None:
             tool_desc = func.__doc__
-        
 
         func.schema = Tool(
             name=tool_name,
@@ -51,7 +64,7 @@ class Tool:
         # Populate tool_params if not provided
         if not self.parameters:
             params = list(self.signature.parameters.items())
-            
+
             if self.is_method():
                 params = params[1:]
 
@@ -59,7 +72,7 @@ class Tool:
                 k: f"The {k}" if v.annotation is inspect._empty else v.annotation
                 for k, v in params
             }
-    
+
     @property
     def usage(self):
         text = f"\n{self.name}("
@@ -69,4 +82,4 @@ class Tool:
 
     def is_method(self):
         first_param = list(self.signature.parameters.values())[0]
-        return first_param.name == 'self' and isinstance(first_param.annotation, type)
+        return first_param.name == "self" and isinstance(first_param.annotation, type)
