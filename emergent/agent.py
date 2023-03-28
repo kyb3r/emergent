@@ -106,7 +106,7 @@ class ToolManager:
         return msg
 
 class ChatAgent:
-    """A basic chatbot agent that uses OpenAI's GPT-3.5 turbo API."""
+    """A basic chatbot agent that uses OpenAI's chat completions API."""
 
     def __init__(
         self,
@@ -114,7 +114,7 @@ class ChatAgent:
         tools: Optional[List[callable]] = None,
         message_window=20,
         rolling_window_size=20,
-        model="gpt-3.5-turbo",
+        model="gpt-4",
     ):
         self.language_model = model
         self.tools = tools or []

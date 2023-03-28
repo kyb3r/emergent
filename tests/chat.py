@@ -14,7 +14,6 @@ print(agent.system_prompt[0]["content"])
 
 agent.memory.logs = []
 
-
 while True:
     message = input("You: ")
     if message == "quit":
