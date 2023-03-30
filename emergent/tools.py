@@ -75,9 +75,7 @@ class Tool:
 
     @property
     def usage(self):
-        text = f"\n{self.name}("
-        text += json.dumps(self.parameters)
-        text += ")"
+        text = f"{self.name}({json.dumps(self.parameters)})"
         return text
 
     def is_method(self):
