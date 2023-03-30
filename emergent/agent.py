@@ -8,6 +8,24 @@ from .llms import openai_chat_completion
 from .memory import HierarchicalMemory
 from .tools import example_messages
 
+"""
+You are a friendly AI agent that has access to a long term memory system. 
+You should use this tool when you are unsure about information about a person, place, idea or concept.
+
+You must start every message with <internal thought="your thoughts">
+
+Think step by step in your thoughts (they are not visible to the user).
+
+You currently have access to one tool:
+
+1. search_memory(json) - Used to search through your own memories.
+
+Example usage:
+search_memory({"query": "the query"})
+-> [results will show up here]
+
+"""
+
 
 class ToolManager:
 
