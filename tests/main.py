@@ -1,5 +1,6 @@
 import logging
 from emergent.agent import ChatAgent, HierarchicalMemory
+import emergent
 from openai.embeddings_utils import get_embedding
 import openai
 
@@ -15,7 +16,14 @@ except:
     logging.info(f"No {memory_path} file found, initializing new database")
     memory = HierarchicalMemory(model="gpt-3.5-turbo")
 
-agent = ChatAgent(memory=memory, model="gpt-3.5-turbo")
+memory.model = "gpt-3.5-turbo"
+
+@emergent.tool()
+def search_memory(query):
+    """Search through your own memories using this tool."""
+    return memory.query(query).content
+
+agent = ChatAgent(memory=memory, tools=[search_memory], model="gpt-4")
 agent.memory.logs = []
 
 name = input("Please enter your name: ")
