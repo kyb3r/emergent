@@ -26,7 +26,11 @@ def search_memory(query):
 agent = ChatAgent(memory=memory, tools=[search_memory], model="gpt-4")
 agent.memory.logs = []
 
-name = input("Please enter your name: ")
+print(agent.system_prompt)
+print(agent.language_model)
+
+name = "User: "
+
 while True:
     try:
         message = input(f"{name}: ")
