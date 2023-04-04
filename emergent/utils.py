@@ -45,7 +45,7 @@ def process_response(response):
         if (token == "<hidden" or token == "<") and not thinking:
             print_colored("[thinking...]\n", Fore.YELLOW)
             thinking = True
-        elif token == "__" and not using_tool:
+        elif token in [" __","__"] and not using_tool:
             print_colored("[using tool...] ", Fore.GREEN)
             using_tool = True
         elif not using_tool and not thinking and isinstance(token, str):
@@ -61,5 +61,5 @@ def process_response(response):
                 using_tool = False
                 thinking = False
 
-        if (token in ['">', " >", ">", "> ", " />", "/>"]) and thinking:
+        if (token in ['">', " >", ">", "> ", " />", "/>", '" />']) and thinking:
             thinking = False

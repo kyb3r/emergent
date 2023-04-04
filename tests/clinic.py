@@ -5,14 +5,14 @@ import json
 
 AVAILABLE = {
     "lee": {
-        "Monday": ["10:00", "11:00", "12:00"],
-        "Tuesday": ["10:00", "11:00", "12:00"],
-        "Wednesday": ["10:00", "11:00", "12:00"],
+        "Monday": ["10am", "11am", "12pm"],
+        "Tuesday": ["10am", "11am", "12pm"],
+        "Wednesday": ["10am", "11am", "12pm"],
     },
     "smith": {
-        "Friday": ["16:00", "17:00", "18:00"],
-        "Saturday": ["10:00", "11:00", "12:00"],
-        "Sunday": ["10:00", "11:00", "12:00"],
+        "Friday": ["4pm", "5pm", "6pm"],
+        "Saturday": ["10am", "11am", "12pm"],
+        "Sunday": ["10am", "11am", "12pm"],
     },
 }
 
