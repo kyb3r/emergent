@@ -61,5 +61,5 @@ def process_response(response):
                 using_tool = False
                 thinking = False
 
-        if (token in ['">', " >", ">", "> "]) and thinking:
+        if (token in ['">', " >", ">", "> ", " />", "/>"]) and thinking:
             thinking = False
