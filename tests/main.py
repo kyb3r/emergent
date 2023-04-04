@@ -18,10 +18,12 @@ except:
 
 memory.model = "gpt-3.5-turbo"
 
+
 @emergent.tool()
 def search_memory(query):
     """Search through your own memories using this tool."""
     return memory.query(query).content
+
 
 agent = ChatAgent(memory=memory, tools=[search_memory], model="gpt-4")
 agent.memory.logs = []
