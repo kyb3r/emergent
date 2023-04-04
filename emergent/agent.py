@@ -178,7 +178,7 @@ class ChatAgent:
         )
 
         self.instructions = (
-            'You must start every message with <hidden thought=your concise reasoning and next steps/> [your response to the user]\n'
+            'You must start every message with <hidden thought="your concise reasoning and next steps"/> [tool usage here or your response to the user]\n'
             "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
         )
 
@@ -219,7 +219,7 @@ class ChatAgent:
             + self.system_message
             + self.messages
             + prefix,
-            temperature=0.2,
+            temperature=0.5,
             stop=["->"],
             stream=True,
         )

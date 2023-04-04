@@ -60,6 +60,7 @@ def process_response(response):
             if "tool_result" in token:
                 using_tool = False
                 thinking = False
+            continue
 
-        if (token in ['">', " >", ">", "> ", " />", "/>", '" />']) and thinking:
+        if (token.strip() in ['">', " >", ">", "> ", " />", "/>", '" />', '"/>']) and thinking:
             thinking = False
