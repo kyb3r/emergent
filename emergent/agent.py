@@ -26,7 +26,7 @@ class ToolManager:
         self.agent = agent
         self.tools = agent.tools
 
-    def handle_message(self, content):
+    def handle_message(self, generator):
         """
         Process a message from the agent. If the message contains a tool call,
         process it and return the LLM's response to the tool.
@@ -35,20 +35,45 @@ class ToolManager:
         # Keep executing tools in a chain until the agent stops calling them
         # TODO: add a timeout/max tries to prevent infinite loops
 
+
+        content = None
+
+        for token in generator:
+            if isinstance(token, list):
+                content = token[0]
+                break
+            yield token
+
         while (match := self.parse_tools(content)) is not None:
             tool, kwargs, matched_string, prefix = match
-            print("FUNCTION CALL: ", tool.schema.name, kwargs)
+            # print("FUNCTION CALL: ", tool.schema.name, kwargs)
+
+            yield {
+                "tool_name": tool.schema.name,
+                "tool_params": kwargs,
+            }
 
             result = self.process_tool(tool, kwargs, matched_string, prefix)
-            content = self.agent.get_response()
+
+            yield {
+                "tool_result": result,
+            }
+
+            
+            generator = self.agent.get_response()
+        
+            for token in generator:
+                if isinstance(token, list):
+                    content = token[0]
+                    break
+                yield token
 
         self.agent.add_message(role="assistant", content=content)
-        return content
 
     def process_tool(self, tool, kwargs, matched_string, prefix):
         """Process a tool call and return the result of the tool's execution."""
         if isinstance(kwargs, json.JSONDecodeError):
-            result = "Error decoding JSON"
+            result = str(kwargs)
         else:
             result = self.call_tool(tool, kwargs)
 
@@ -77,7 +102,7 @@ class ToolManager:
 
     def parse_tools(self, content):
         """Parse a message for tool calls and return the tool and its parameters."""
-        tool_patterns = [(rf"{tool.schema.name}\((.*?)\)", tool) for tool in self.tools]
+        tool_patterns = [(rf"__{tool.schema.name}\((.*?)\)", tool) for tool in self.tools]
 
         for pattern, tool in tool_patterns:
             match = re.search(pattern, content, re.DOTALL)
@@ -109,7 +134,7 @@ class ToolManager:
         
 
         for i, tool in enumerate(self.tools):
-            msg += f"{i+1}. `{tool.schema.name}(json)` - {tool.schema.description}\n\n"
+            msg += f"{i+1}. `__{tool.schema.name}(json)` - {tool.schema.description}\n\n"
             msg += "Example usage:\n"
             msg += tool.schema.usage + "\n-> [results will show up here]\n\n"
         return msg
@@ -181,15 +206,27 @@ class ChatAgent:
             model=self.language_model,
             messages=self.k_shot_messages + self.system_message + self.messages + prefix,
             temperature=0.2,
-            stop=["->"]
+            stop=["->"],
+            stream=True
         )
 
-        response = response.choices[0].message.content 
-        if response.startswith("hidden thought="):
-            response = "<" + response
+        role = next(response)
 
-        print(response)
-        return response
+        text = next(response).choices[0].delta.content
+        if text == "hidden":
+            text = "<" + text
+        
+        yield text
+        
+        for chunk in response:
+
+            delta = chunk.choices[0].delta
+            if "content" not in delta:
+                break
+            text += delta.content
+            yield delta.content
+
+        yield [text]
 
     def send(self, message) -> str:
         """Send a message to the agent. While also managing chat history."""
