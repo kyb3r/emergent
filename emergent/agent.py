@@ -7,6 +7,7 @@ import logging
 from .llms import openai_chat_completion
 from .memory import HierarchicalMemory
 from .tools import example_messages
+from .utils import process_response, print_colored, Fore
 
 
 class ToolManager:
@@ -26,7 +27,7 @@ class ToolManager:
         self.agent = agent
         self.tools = agent.tools
 
-    def handle_message(self, content):
+    def handle_message(self, generator):
         """
         Process a message from the agent. If the message contains a tool call,
         process it and return the LLM's response to the tool.
@@ -35,20 +36,43 @@ class ToolManager:
         # Keep executing tools in a chain until the agent stops calling them
         # TODO: add a timeout/max tries to prevent infinite loops
 
+        content = None
+
+        for token in generator:
+            if isinstance(token, list):
+                content = token[0]
+                break
+            yield token
+
         while (match := self.parse_tools(content)) is not None:
             tool, kwargs, matched_string, prefix = match
-            print("FUNCTION CALL: ", tool.schema.name, kwargs)
+            # print("FUNCTION CALL: ", tool.schema.name, kwargs)
+
+            yield {
+                "tool_name": tool.schema.name,
+                "tool_params": kwargs,
+            }
 
             result = self.process_tool(tool, kwargs, matched_string, prefix)
-            content = self.agent.get_response()
+
+            yield {
+                "tool_result": result,
+            }
+
+            generator = self.agent.get_response(prefix=None)
+
+            for token in generator:
+                if isinstance(token, list):
+                    content = token[0]
+                    break
+                yield token
 
         self.agent.add_message(role="assistant", content=content)
-        return content
 
     def process_tool(self, tool, kwargs, matched_string, prefix):
         """Process a tool call and return the result of the tool's execution."""
         if isinstance(kwargs, json.JSONDecodeError):
-            result = "Error decoding JSON"
+            result = "Error decoding JSON, use double quotes and do not use a tool inside your thoughts."
         else:
             result = self.call_tool(tool, kwargs)
 
@@ -77,13 +101,20 @@ class ToolManager:
 
     def parse_tools(self, content):
         """Parse a message for tool calls and return the tool and its parameters."""
-        tool_patterns = [(rf"{tool.schema.name}\((.*?)\)", tool) for tool in self.tools]
+        tool_patterns = [
+            (rf"__{tool.schema.name}\((.*?)\)", tool) for tool in self.tools
+        ]
 
         for pattern, tool in tool_patterns:
             match = re.search(pattern, content, re.DOTALL)
             if match:
                 tool_data = self.extract_data(match)
-                return tool, tool_data, content[match.start() : match.end()], content[:match.start()]
+                return (
+                    tool,
+                    tool_data,
+                    content[match.start() : match.end()],
+                    content[: match.start()],
+                )
 
         return None
 
@@ -98,21 +129,23 @@ class ToolManager:
     def format_tool_usage(self):
         if not self.tools:
             return "TOOLS\n-------\nCurrently you have no tools available."
-        
+
         msg = "TOOLS\n-------\n"
-        msg += "The way you can use a tool is by calling them in your messages with a JSON object as the parameter. "
+        msg += "The way you can use a tool is by calling them in your messages with raw JSON as the sole argument. You can only tools outside the thought tag."
 
         if len(self.tools) > 1:
             msg += f"You currently have access to {len(self.tools)} tools:\n\n"
         else:
             msg += "You currently have access to one tool:\n\n"
-        
 
         for i, tool in enumerate(self.tools):
-            msg += f"{i+1}. `{tool.schema.name}(json)` - {tool.schema.description}\n\n"
+            msg += (
+                f"{i+1}. `__{tool.schema.name}(json)` - {tool.schema.description}\n\n"
+            )
             msg += "Example usage:\n"
             msg += tool.schema.usage + "\n-> [results will show up here]\n\n"
         return msg
+
 
 class ChatAgent:
     """A basic chatbot agent that uses OpenAI's chat completions API."""
@@ -134,31 +167,31 @@ class ChatAgent:
 
         self.memory = memory
         if self.memory:
+            self.memory.logs = []
             self.memory.rolling_window_size = rolling_window_size
         self.messages = []
         self.message_window = message_window
         self.system_prompt = []
-        self.system_prompt = ""
-
-        self.system_prompt = (
+        self.personality = (
             "You are a friendly AI agent that has access to a variety of tools. "
             "You can use these tools to help you solve problems.\n\n"
-            """You must start every message with <hidden thought="your reasoning and next steps"> [your response to the use]\n"""
+        )
+
+        self.instructions = (
+            'You must start every message with <hidden thought="your reasoning and next steps"/> [your response to the user]\n'
             "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
         )
 
         if self.memory:
-            self.system_prompt = (
+            self.personality = (
                 "You are a friendly AI agent that has access to a long term memory system. "
                 "You should use this tool when you are unsure about information about a person, place, idea or concept.\n\n"
-            """You must start every message with <hidden thought="your reasoning and next steps"> [your response to the user]\n"""
-            "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
             )
             if len(self.tools) > 1:
-                self.system_prompt += (
-                    "You also have access to a variety of other tools that you can use to help you solve problems.\n\n"
-                )
+                self.personality += "You also have access to a variety of other tools that you can use to help you solve problems.\n\n"
         
+        self.system_prompt = self.personality + self.instructions
+
         usage = self.tool_manager.format_tool_usage()
         self.system_prompt += usage
 
@@ -172,24 +205,42 @@ class ChatAgent:
         if self.memory:
             self.memory.add_log(role, content)
 
-    def get_response(self) -> str:
+    def get_response(self, prefix="<") -> str:
         """Get a response from the agent."""
 
-        prefix = [{"role": "assistant", "content": "<"}]
+        if prefix is not None:
+            prefix = [{"role": "assistant", "content": prefix}]
+        else:
+            prefix = []
 
         response = openai_chat_completion(
             model=self.language_model,
-            messages=self.k_shot_messages + self.system_message + self.messages + prefix,
+            messages=self.k_shot_messages
+            + self.system_message
+            + self.messages
+            + prefix,
             temperature=0.2,
-            stop=["->"]
+            stop=["->"],
+            stream=True,
         )
 
-        response = response.choices[0].message.content 
-        if response.startswith("hidden thought="):
-            response = "<" + response
+        role = next(response)
 
-        print(response)
-        return response
+        text = next(response).choices[0].delta.get("content", "")
+        if text == "hidden":
+            text = "<" + text
+
+        yield text
+
+        for chunk in response:
+
+            delta = chunk.choices[0].delta
+            if "content" not in delta:
+                break
+            text += delta.content
+            yield delta.content
+
+        yield [text]
 
     def send(self, message) -> str:
         """Send a message to the agent. While also managing chat history."""
@@ -210,3 +261,19 @@ class ChatAgent:
         """Removes the first messages, when the current length of messages is longer then the message_window"""
         while len(self.messages) > self.message_window:
             self.messages.pop(0)  # Remove the oldest message
+
+    def run(self):
+        """Runs a simple chat loop in the terminal"""
+        try:
+            while True:
+                print_colored("You: ", Fore.BLUE)
+                message = input("")
+                print()
+                if message == "quit":
+                    break
+                response = self.send(message)
+                print_colored("Agent: ", Fore.BLUE)
+                process_response(response)
+                print("\n")
+        except KeyboardInterrupt:
+            print(self.messages)
