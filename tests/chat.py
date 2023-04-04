@@ -11,5 +11,5 @@ def search_memory(query):
     return memory.query(query).content
 
 
-agent = ChatAgent(memory=memory, tools=[search_memory], model="gpt-4")
+agent = ChatAgent(memory=memory, tools=[search_memory], model="gpt-3.5-turbo")
 agent.run()

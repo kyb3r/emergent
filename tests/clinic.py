@@ -51,7 +51,7 @@ def available_times(
 def book_appointment(
     doctor: "Name of doctor",
     time: "Time of appointment",
-    date: "Date of appointment",
+    day: "day of appointment",
     full_name: "Full name of patient",
     age: "Age of patient",
     phone_number: "Phone number of patient",
@@ -73,7 +73,8 @@ class SearchEngine:
 engine = SearchEngine()
 
 agent = ChatAgent(
-    tools=[available_times, book_appointment, engine.search], model="gpt-4-0314"
+    tools=[available_times, book_appointment, engine.search], model="gpt-4"
 )
 
 agent.run()
+
