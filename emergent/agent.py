@@ -59,7 +59,7 @@ class ToolManager:
                 "tool_result": result,
             }
 
-            generator = self.agent.get_response()
+            generator = self.agent.get_response(prefix=None)
 
             for token in generator:
                 if isinstance(token, list):
@@ -72,7 +72,7 @@ class ToolManager:
     def process_tool(self, tool, kwargs, matched_string, prefix):
         """Process a tool call and return the result of the tool's execution."""
         if isinstance(kwargs, json.JSONDecodeError):
-            result = "Error decoding JSON, use double quotes and do not escape them."
+            result = "Error decoding JSON, use double quotes and do not use a tool inside your thoughts."
         else:
             result = self.call_tool(tool, kwargs)
 
@@ -131,7 +131,7 @@ class ToolManager:
             return "TOOLS\n-------\nCurrently you have no tools available."
 
         msg = "TOOLS\n-------\n"
-        msg += "The way you can use a tool is by calling them in your messages with raw JSON as the sole argument."
+        msg += "The way you can use a tool is by calling them in your messages with raw JSON as the sole argument. You can only tools outside the thought tag."
 
         if len(self.tools) > 1:
             msg += f"You currently have access to {len(self.tools)} tools:\n\n"
@@ -172,24 +172,25 @@ class ChatAgent:
         self.messages = []
         self.message_window = message_window
         self.system_prompt = []
-        self.system_prompt = ""
-
-        self.system_prompt = (
+        self.personality = (
             "You are a friendly AI agent that has access to a variety of tools. "
             "You can use these tools to help you solve problems.\n\n"
-            """You must start every message with <hidden thought="your reasoning and next steps"> [your response to the user]\n"""
+        )
+
+        self.instructions = (
+            'You must start every message with <hidden thought="your reasoning and next steps"> [your response to the user]\n'
             "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
         )
 
         if self.memory:
-            self.system_prompt = (
+            self.personality = (
                 "You are a friendly AI agent that has access to a long term memory system. "
                 "You should use this tool when you are unsure about information about a person, place, idea or concept.\n\n"
-                """You must start every message with <hidden thought="your reasoning and next steps"> [your response to the user]\n"""
-                "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
             )
             if len(self.tools) > 1:
-                self.system_prompt += "You also have access to a variety of other tools that you can use to help you solve problems.\n\n"
+                self.personality += "You also have access to a variety of other tools that you can use to help you solve problems.\n\n"
+        
+        self.system_prompt = self.personality + self.instructions
 
         usage = self.tool_manager.format_tool_usage()
         self.system_prompt += usage
@@ -204,10 +205,13 @@ class ChatAgent:
         if self.memory:
             self.memory.add_log(role, content)
 
-    def get_response(self) -> str:
+    def get_response(self, prefix="<") -> str:
         """Get a response from the agent."""
 
-        prefix = [{"role": "assistant", "content": "<"}]
+        if prefix is not None:
+            prefix = [{"role": "assistant", "content": prefix}]
+        else:
+            prefix = []
 
         response = openai_chat_completion(
             model=self.language_model,
@@ -222,7 +226,7 @@ class ChatAgent:
 
         role = next(response)
 
-        text = next(response).choices[0].delta.content
+        text = next(response).choices[0].delta.get("content", "")
         if text == "hidden":
             text = "<" + text
 
