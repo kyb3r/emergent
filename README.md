@@ -17,7 +17,7 @@ def search(query):
     return "Results: ..."
    
 agent = ChatAgent(tools=[search])
-response = agent.send("What is the company's policy on remote work?")
+agent.run()
     
 ```
 
@@ -28,8 +28,7 @@ from emergent import ChatAgent, HierarchicalMemory
 
 memory = HierarchicalMemory.from_json("memories.json")
 agent = ChatAgent(memory=memory)
-
-response = agent.send("What is my birthday?")
+agent.run()
 ```
 
 
