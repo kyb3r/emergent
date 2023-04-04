@@ -54,7 +54,7 @@ class ToolManager:
 
         # Make the agent think that calling the tool worked
         self.agent.messages.append(
-            dict(role="assistant", content=f"{matched_string}\n-> {result}")
+            dict(role="assistant", content=f"{matched_string}\n-> [{result}]")
         )
         return result
 
@@ -97,12 +97,21 @@ class ToolManager:
 
     def format_tool_usage(self):
         if not self.tools:
-            return "No tools available."
-        msg = "Below is a list of tools you can use (ensure your payload is always in JSON format):\n\n"
+            return "TOOLS\n-------\nCurrently you have no tools available."
+        
+        msg = "TOOLS\n-------\n"
+        msg += "The way you can use a tool is by calling them in your messages with a JSON object as the parameter. "
+
+        if len(self.tools) > 1:
+            msg += f"You currently have access to {len(self.tools)} tools:\n\n"
+        else:
+            msg += "You currently have access to one tool:\n\n"
+        
+
         for i, tool in enumerate(self.tools):
             msg += f"{i+1}. `{tool.schema.name}(json)` - {tool.schema.description}\n\n"
             msg += "Example usage:\n"
-            msg += tool.schema.usage + "\n\n\n"
+            msg += tool.schema.usage + "\n-> [results will show up here]\n\n"
         return msg
 
 class ChatAgent:
@@ -120,46 +129,55 @@ class ChatAgent:
         self.tools = tools or []
         self.k_shot_messages = []
         self.tool_manager = ToolManager(self)
-        if self.tools:
+        if memory:
             self.k_shot_messages = example_messages
+
         self.memory = memory
-        self.memory.rolling_window_size = rolling_window_size
+        if self.memory:
+            self.memory.rolling_window_size = rolling_window_size
         self.messages = []
         self.message_window = message_window
         self.system_prompt = []
-        self.set_system_prompt(
-            "You are an artificial intelligence system that is connected to "
-            "external tools and a long term memory management system. "
-            "When you don't have enough information to answer a question, try using the search_memory tool to get more info\n\nTOOLS:\n"
-            "You have access to external tools right now. When you write a "
-            "function call with the sole argument as a JSON payload, "
-            "the system will intercept and get the data that you provided "
-            "and then it will run the code for the tool. You must never tell "
-            "the user the specifics of the tools available to you.\n\n"
+        self.system_prompt = ""
+
+        self.system_prompt = (
+            "You are a friendly AI agent that has access to a variety of tools. "
+            "You can use these tools to help you solve problems.\n\n"
         )
+        if self.memory:
+            self.system_prompt = (
+                "You are an AI agent that has access to a long term memory system. "
+                "You should use this tool when you are unsure about information about a person, place, idea or concept.\n\n"
+
+            )
+            if len(self.tools) > 1:
+                self.system_prompt += (
+                    "You also have access to a variety of other tools that you can use to help you solve problems.\n\n"
+                )
         
         usage = self.tool_manager.format_tool_usage()
-        self.system_prompt[0]["content"] += usage
+        self.system_prompt += usage
 
-    def set_system_prompt(self, prompt: str):
-        """Set the system prompt for the agent."""
-        self.system_prompt = [{"role": "system", "content": prompt}]
+    @property
+    def system_message(self):
+        return [{"role": "system", "content": self.system_prompt}]
 
     def add_message(self, role: str, content: str):
         """Add a message to the agent's memory."""
         self.messages.append({"role": role, "content": content})
-        self.memory.add_log(role, content)
+        if self.memory:
+            self.memory.add_log(role, content)
 
     def get_response(self) -> str:
         """Get a response from the agent."""
 
         response = openai_chat_completion(
             model=self.language_model,
-            messages=self.k_shot_messages + self.system_prompt + self.messages,
+            messages=self.k_shot_messages + self.system_message + self.messages,
             temperature=0.2,
             stop=["->"]
         )
-
+        print(response.choices[0].message.content)
         return response.choices[0].message.content
 
     def send(self, message) -> str:

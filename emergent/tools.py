@@ -5,13 +5,13 @@ import json
 
 example_messages = [
     {
-        "role": "user",
-        "content": "[Example question from the user that might require memory access]",
+        "role": "system",
+        "content": "[Example question from the user that might require a tool to answer]",
         "name": "example_user",
     },
     {
-        "role": "assistant",
-        "content": 'search_memory({"query": "foobar"})\n-> [results from the tool]',
+        "role": "system",
+        "content": 'tool_name({"arg1": "foobar"})\n-> [results from the tool]\n# This is how you call a tool',
         "name": "example_assistant",
     },
 ]
