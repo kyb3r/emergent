@@ -2,6 +2,12 @@
 
 Emergent is a library designed to enhance LLMs like GPT-4 by providing an easy way to integrate external tools and long-term memory capabilities. With Emergent, you can effortlessly transform any Python function into a tool that LLMs can utilize. The library also includes a built-in implementation of a long-term memory system called [HMCS](https://github.com/daveshap/HierarchicalMemoryConsolidationSystem), which seeks to emulate human-like memory organization and recall. 
 
+
+
+https://user-images.githubusercontent.com/29310830/229719121-4d1dae6e-9282-4353-8d54-008bbc35f78e.MOV
+
+
+
 # Usage
 
 Making your own tools
