@@ -2,7 +2,9 @@ import sys
 import threading
 import itertools
 import time
+from colorama import init, Fore, Style
 
+init(autoreset=True)
 
 class Spinner:
     def __init__(self, message="Loading...", delay=0.1):
@@ -29,3 +31,32 @@ class Spinner:
         self.spinner_thread.join()
         sys.stdout.write('\r' + ' ' * (len(self.message) + 2) + '\r')
         sys.stdout.flush()
+
+def print_colored(text, color=Fore.RESET):
+    print(color + text, end="", flush=True)
+
+def process_response(response):
+    thinking = False
+    using_tool = False
+    for token in response:
+        if (token == "<hidden" or token == "<") and not thinking:
+            print_colored("[thinking...]\n", Fore.YELLOW)
+            thinking = True
+        elif token == "__" and not using_tool:
+            print_colored("[using tool...] ", Fore.GREEN)
+            using_tool = True
+        elif not using_tool and not thinking and isinstance(token, str):
+            print_colored(token)
+
+        if isinstance(token, dict):
+            if "tool_name" in token:
+                print_colored(f'[{token["tool_name"]}] ', Fore.GREEN)
+                print_colored(f'args {token["tool_params"]}\n', Fore.LIGHTGREEN_EX)
+                using_tool = False
+                thinking = False
+            if "tool_result" in token:
+                using_tool = False
+                thinking=False
+
+        if token == '">' and thinking:
+            thinking = False

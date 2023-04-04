@@ -7,6 +7,7 @@ import logging
 from .llms import openai_chat_completion
 from .memory import HierarchicalMemory
 from .tools import example_messages
+from .utils import process_response, print_colored, Fore
 
 
 class ToolManager:
@@ -73,7 +74,7 @@ class ToolManager:
     def process_tool(self, tool, kwargs, matched_string, prefix):
         """Process a tool call and return the result of the tool's execution."""
         if isinstance(kwargs, json.JSONDecodeError):
-            result = str(kwargs)
+            result = "Error decoding JSON, use double quotes and do not escape them."
         else:
             result = self.call_tool(tool, kwargs)
 
@@ -125,7 +126,7 @@ class ToolManager:
             return "TOOLS\n-------\nCurrently you have no tools available."
         
         msg = "TOOLS\n-------\n"
-        msg += "The way you can use a tool is by calling them in your messages with a JSON object as the parameter. "
+        msg += "The way you can use a tool is by calling them in your messages with raw JSON as the sole argument."
 
         if len(self.tools) > 1:
             msg += f"You currently have access to {len(self.tools)} tools:\n\n"
@@ -168,7 +169,7 @@ class ChatAgent:
         self.system_prompt = (
             "You are a friendly AI agent that has access to a variety of tools. "
             "You can use these tools to help you solve problems.\n\n"
-            """You must start every message with <hidden thought="your reasoning and next steps"> [your response to the use]\n"""
+            """You must start every message with <hidden thought="your reasoning and next steps"> [your response to the user]\n"""
             "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
         )
 
@@ -247,3 +248,20 @@ class ChatAgent:
         """Removes the first messages, when the current length of messages is longer then the message_window"""
         while len(self.messages) > self.message_window:
             self.messages.pop(0)  # Remove the oldest message
+    
+    def run(self):
+        """Runs a simple chat loop in the terminal"""
+        try:
+            while True:
+                print_colored("You: ", Fore.BLUE)
+                message = input("")
+                print()
+                if message == "quit":
+                    break
+                response = self.send(message)
+                print_colored("Agent: ", Fore.BLUE)
+                process_response(response)
+                print("\n")
+        except KeyboardInterrupt:
+            print(self.messages)
+

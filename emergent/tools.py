@@ -11,7 +11,7 @@ example_messages = [
     },
     {
         "role": "system",
-        "content": '_reasoning("because the user said x i must use tool_name to find out")\ntool_name({"arg1": "foobar"})\n-> [results from the tool]\n# This is how you call a tool',
+        "content": '<hidden thought="[your thoughts]">\ntool_name({"arg1": "foobar"})\n-> [results from the tool]\n# This is how you call a tool',
         "name": "example_assistant",
     },
 ]

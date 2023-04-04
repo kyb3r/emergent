@@ -76,26 +76,8 @@ class SearchEngine:
 
 engine = SearchEngine()
 
-print(engine.search("hi"))
-
 agent = ChatAgent(
-    tools=[available_times, book_appointment, engine.search], model="gpt-4"
+    tools=[available_times, book_appointment, engine.search], model="gpt-4-0314"
 )
 
-
-
-print(agent.system_prompt)
-
-try:
-    while True:
-        message = input("You: ")
-        if message == "quit":
-            print(json.dumps(agent.messages, indent=4))
-            break
-        print()
-        print("Assistant:", agent.send(message))
-        print()
-except:
-    print(json.dumps(agent.messages, indent=4))
-    import traceback
-    traceback.print_exc()
+agent.run()

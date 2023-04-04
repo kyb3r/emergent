@@ -11,7 +11,7 @@ def get_long_description() -> str:
         return ld_file.read()
 
 
-install_requires = ["openai"]
+install_requires = ["openai", "colorama"]
 
 setup(
     name="emergent",
