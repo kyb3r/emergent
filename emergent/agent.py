@@ -131,12 +131,12 @@ class ToolManager:
             return "TOOLS\n-------\nCurrently you have no tools available."
 
         msg = "TOOLS\n-------\n"
-        msg += "The way you can use a tool is by calling them in your messages with raw JSON as the sole argument. You can only tools outside the thought tag."
+        msg += "The way you can use a tool is by calling them in your messages with raw JSON as the sole argument. You can only tools outside the thought tag.\n\n"
 
         if len(self.tools) > 1:
             msg += f"You currently have access to {len(self.tools)} tools:\n\n"
         else:
-            msg += "You currently have access to one tool:\n\n"
+            msg += "You currently have access to only one tool:\n\n"
 
         for i, tool in enumerate(self.tools):
             msg += (
@@ -173,12 +173,12 @@ class ChatAgent:
         self.message_window = message_window
         self.system_prompt = []
         self.personality = (
-            "You are a friendly AI agent that has access to a variety of tools. "
+            "You are a friendly AI agent that has access to a variety of tools listed below. "
             "You can use these tools to help you solve problems.\n\n"
         )
 
         self.instructions = (
-            'You must start every message with <hidden thought="your reasoning and next steps"/> [your response to the user]\n'
+            'You must start every message with <hidden thought="your concise reasoning and next steps"/> [tool usage here or your response to the user]\n'
             "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
         )
 
