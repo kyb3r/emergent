@@ -9,7 +9,7 @@ def search_memory(query):
     """Search through your own memories using this tool."""
     return memory.query(query).content
 
-agent = ChatAgent(memory=memory, tools=[search_memory], model="gpt-4-0314")
+agent = ChatAgent(memory=memory, tools=[search_memory], model="gpt-4")
 print(agent.system_prompt)
 print(agent.k_shot_messages)
 

@@ -36,16 +36,16 @@ class ToolManager:
         # TODO: add a timeout/max tries to prevent infinite loops
 
         while (match := self.parse_tools(content)) is not None:
-            tool, kwargs, matched_string = match
+            tool, kwargs, matched_string, prefix = match
             print("FUNCTION CALL: ", tool.schema.name, kwargs)
 
-            result = self.process_tool(tool, kwargs, matched_string)
+            result = self.process_tool(tool, kwargs, matched_string, prefix)
             content = self.agent.get_response()
 
         self.agent.add_message(role="assistant", content=content)
         return content
 
-    def process_tool(self, tool, kwargs, matched_string):
+    def process_tool(self, tool, kwargs, matched_string, prefix):
         """Process a tool call and return the result of the tool's execution."""
         if isinstance(kwargs, json.JSONDecodeError):
             result = "Error decoding JSON"
@@ -54,7 +54,7 @@ class ToolManager:
 
         # Make the agent think that calling the tool worked
         self.agent.messages.append(
-            dict(role="assistant", content=f"{matched_string}\n-> [{result}]")
+            dict(role="assistant", content=f"{prefix}\n{matched_string}\n-> [{result}]")
         )
         return result
 
@@ -83,7 +83,7 @@ class ToolManager:
             match = re.search(pattern, content, re.DOTALL)
             if match:
                 tool_data = self.extract_data(match)
-                return tool, tool_data, content[match.start() : match.end()]
+                return tool, tool_data, content[match.start() : match.end()], content[:match.start()]
 
         return None
 
@@ -143,12 +143,16 @@ class ChatAgent:
         self.system_prompt = (
             "You are a friendly AI agent that has access to a variety of tools. "
             "You can use these tools to help you solve problems.\n\n"
+            """You must start every message with <hidden thought="your reasoning and next steps"> [your response to the use]\n"""
+            "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
         )
+
         if self.memory:
             self.system_prompt = (
-                "You are an AI agent that has access to a long term memory system. "
+                "You are a friendly AI agent that has access to a long term memory system. "
                 "You should use this tool when you are unsure about information about a person, place, idea or concept.\n\n"
-
+            """You must start every message with <hidden thought="your reasoning and next steps"> [your response to the user]\n"""
+            "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
             )
             if len(self.tools) > 1:
                 self.system_prompt += (
@@ -171,14 +175,21 @@ class ChatAgent:
     def get_response(self) -> str:
         """Get a response from the agent."""
 
+        prefix = [{"role": "assistant", "content": "<"}]
+
         response = openai_chat_completion(
             model=self.language_model,
-            messages=self.k_shot_messages + self.system_message + self.messages,
+            messages=self.k_shot_messages + self.system_message + self.messages + prefix,
             temperature=0.2,
             stop=["->"]
         )
-        print(response.choices[0].message.content)
-        return response.choices[0].message.content
+
+        response = response.choices[0].message.content 
+        if response.startswith("hidden thought="):
+            response = "<" + response
+
+        print(response)
+        return response
 
     def send(self, message) -> str:
         """Send a message to the agent. While also managing chat history."""
