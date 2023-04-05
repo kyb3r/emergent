@@ -4,12 +4,11 @@ from langchain import SerpAPIWrapper
 
 
 @emergent.tool()
-def search_web(query):
+def google_search(query):
     """Search the web using this tool."""
     serpapi = SerpAPIWrapper()
     return serpapi.run(query)
 
-agent = ChatAgent(tools=[search_web], model="gpt-4")
+agent = ChatAgent(tools=[google_search], model="gpt-4")
 
-print(agent.system_prompt)
 agent.run()
