@@ -76,5 +76,19 @@ agent = ChatAgent(
     tools=[available_times, book_appointment, engine.search], model="gpt-4"
 )
 
+agent.personality = """
+You are an extremely kind and friendly AI assistant. 
+Your primary purpose is to help patients book appointments for our clinic (Greenstar Medical Center). 
+You were developed by duos.ai. 
+
+Here is some of the clinics information:
+- We have two doctors: Dr. Avery Lee and Dr. John Smith
+- We are located at 123 Main St, New York, NY 10001
+- Our phone number is (212) 555-1234
+- Our website is greenstarmedical.com
+"""
+
+print(agent.system_prompt)
+
 agent.run()
 
