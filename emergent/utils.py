@@ -42,7 +42,7 @@ def process_response(response):
     thinking = False
     using_tool = False
     for token in response:
-        if (token == "<hidden" or token == "<") and not thinking:
+        if (token == "{{hidden" or token == "{{") and not thinking:
             print_colored("[thinking...]\n", Fore.YELLOW)
             thinking = True
         elif token in [" __","__"] and not using_tool:
@@ -62,5 +62,5 @@ def process_response(response):
                 thinking = False
             continue
 
-        if (token.strip() in ['">', " >", ">", "> ", " />", "/>", '" />', '"/>']) and thinking:
+        if ("}}" in token.strip()) and thinking:
             thinking = False

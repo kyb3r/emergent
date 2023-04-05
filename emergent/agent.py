@@ -131,7 +131,7 @@ class ToolManager:
             return "TOOLS\n-------\nCurrently you have no tools available."
 
         msg = "TOOLS\n-------\n"
-        msg += "The way you can use a tool is by calling them in your messages with raw JSON as the sole argument. You can only tools outside the thought tag.\n\n"
+        msg += "The way you can use a tool is by calling them in your messages with raw JSON as the sole argument. You can only tools outside internal thoughts.\n\n"
 
         if len(self.tools) > 1:
             msg += f"You currently have access to {len(self.tools)} tools:\n\n"
@@ -171,17 +171,14 @@ class ChatAgent:
             self.memory.rolling_window_size = rolling_window_size
         self.messages = []
         self.message_window = message_window
-        self.system_prompt = []
         self.personality = (
             "You are a friendly AI agent that has access to a variety of tools listed below. "
-            "You can use these tools to help you solve problems.\n\n"
+            "You can use these tools to help you solve problems."
         )
-
         self.instructions = (
-            'You must start every message with <hidden thought="your concise reasoning and next steps"/> [tool usage here or your response to the user]\n'
+            '\n\nYou must start every message with {{hidden thought="your extremely concise reasoning and next steps"}} [tool usage here or your response to the user]\n'
             "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
         )
-
         if self.memory:
             self.personality = (
                 "You are a friendly AI agent that has access to a long term memory system. "
@@ -189,11 +186,12 @@ class ChatAgent:
             )
             if len(self.tools) > 1:
                 self.personality += "You also have access to a variety of other tools that you can use to help you solve problems.\n\n"
-        
-        self.system_prompt = self.personality + self.instructions
 
-        usage = self.tool_manager.format_tool_usage()
-        self.system_prompt += usage
+        self.tool_usage = self.tool_manager.format_tool_usage()
+    
+    @property
+    def system_prompt(self):
+        return self.personality + self.instructions + self.tool_usage
 
     @property
     def system_message(self):
@@ -205,7 +203,7 @@ class ChatAgent:
         if self.memory:
             self.memory.add_log(role, content)
 
-    def get_response(self, prefix="<") -> str:
+    def get_response(self, prefix="{{") -> str:
         """Get a response from the agent."""
 
         if prefix is not None:
@@ -228,7 +226,7 @@ class ChatAgent:
 
         text = next(response).choices[0].delta.get("content", "")
         if text == "hidden":
-            text = "<" + text
+            text = "{{" + text
 
         yield text
 
