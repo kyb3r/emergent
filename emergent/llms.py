@@ -7,7 +7,11 @@ from functools import wraps
 
 from dataclasses import dataclass, field
 from typing import Optional, List
+from tiktoken import Tokenizer, TokenizerConfig
 
+def count_tokens(text: str) -> int:
+    tokenizer = Tokenizer(TokenizerConfig())
+    return len(list(tokenizer.tokenize(text)))
 
 def retry_with_exponential_backoff(
     func,
@@ -111,6 +115,15 @@ def chat_gpt_prompt(func):
                 "Returned value must be a string or emergent.Prompt object"
             )
 
+        # Calculate total tokens
+        total_tokens = sum(count_tokens(message["content"]) for message in messages)
+        api_overhead_tokens = 20  # Some overhead tokens for API formatting
+        
+        # Check if total tokens for request exceeds token limit
+        if total_tokens + api_overhead_tokens > 4096:
+            logging.warning("The number of tokens in the prompt exceeds the limit (4096 tokens). Skipping this prompt.")
+            return
+            
         response = openai_chat_completion(
             model=model,
             messages=messages,
