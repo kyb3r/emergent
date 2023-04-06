@@ -88,7 +88,6 @@ Here is some of the clinics information:
 - Our website is greenstarmedical.com
 """
 
-print(agent.system_prompt)
 
 agent.run()
 

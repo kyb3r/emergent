@@ -176,7 +176,8 @@ class ChatAgent:
             "You can use these tools to help you solve problems."
         )
         self.instructions = (
-            '\n\nYou must start every message with {{hidden thought=your extremely concise reasoning and next steps}}[tool usage here or your response to the user]\n'
+            '\n\nYou must start every message with {{hidden thought=your extremely concise reasoning and next steps}}\n'
+            "Your response to the user should be outside your thoughts."
             "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
         )
         if self.memory:
