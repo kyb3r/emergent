@@ -3,11 +3,11 @@ import os
 import openai
 import random
 import time
+import tiktoken
 from functools import wraps
 
 from dataclasses import dataclass, field
 from typing import Optional, List
-from tiktoken
 
 def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
     """Returns the number of tokens used by a list of messages."""
