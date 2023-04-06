@@ -244,7 +244,7 @@ class ChatAgent:
     def send(self, message) -> str:
         """Send a message to the agent. While also managing chat history."""
         self.add_message(role="user", content=message)
-        response = self.get_response(prefix=None)
+        response = self.get_response()
         return self.tool_manager.handle_message(response)
 
     def end_conversation(self, path):
