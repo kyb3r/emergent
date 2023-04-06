@@ -176,7 +176,7 @@ class ChatAgent:
             "You can use these tools to help you solve problems."
         )
         self.instructions = (
-            '\n\nYou must start every message with {{hidden thought="your extremely concise reasoning and next steps"}} [tool usage here or your response to the user]\n'
+            '\n\nYou must start every message with {{hidden thought=your extremely concise reasoning and next steps}}[tool usage here or your response to the user]\n'
             "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
         )
         if self.memory:
@@ -243,7 +243,7 @@ class ChatAgent:
     def send(self, message) -> str:
         """Send a message to the agent. While also managing chat history."""
         self.add_message(role="user", content=message)
-        response = self.get_response()
+        response = self.get_response(prefix=None)
         return self.tool_manager.handle_message(response)
 
     def end_conversation(self, path):

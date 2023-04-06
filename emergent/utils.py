@@ -41,19 +41,22 @@ def print_colored(text, color=Fore.RESET):
 def process_response(response):
     thinking = False
     using_tool = False
+
+    current_tool_name = ""
+
     for token in response:
         if (token == "{{hidden" or token == "{{") and not thinking:
             print_colored("[thinking...]\n", Fore.YELLOW)
             thinking = True
         elif token in [" __","__"] and not using_tool:
             print_colored("[using tool...] ", Fore.GREEN)
+            current_tool_name = ""
             using_tool = True
         elif not using_tool and not thinking and isinstance(token, str):
             print_colored(token)
-
+        
         if isinstance(token, dict):
             if "tool_name" in token:
-                print_colored(f'[{token["tool_name"]}] ', Fore.GREEN)
                 print_colored(f'args {token["tool_params"]}\n', Fore.LIGHTGREEN_EX)
                 using_tool = False
                 thinking = False
@@ -61,6 +64,13 @@ def process_response(response):
                 using_tool = False
                 thinking = False
             continue
+
+        if using_tool:
+            if "(" in token:
+                print_colored(f"[{current_tool_name}] ", Fore.GREEN)
+                current_tool_name = ""
+            elif "__" not in token:
+                current_tool_name += token
 
         if ("}}" in token.strip()) and thinking:
             thinking = False
