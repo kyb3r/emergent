@@ -4,7 +4,10 @@ from collections import defaultdict
 from datetime import datetime
 import json
 import logging
-from openai.embeddings_utils import cosine_similarity
+import numpy as np
+
+def cosine_similarity(a, b):
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 from .llms import chat_gpt_prompt, get_embedding, Prompt
 
