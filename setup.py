@@ -11,7 +11,7 @@ def get_long_description() -> str:
         return ld_file.read()
 
 
-install_requires = ["openai", "colorama"]
+install_requires = ["openai", "colorama", "tiktoken"]
 
 setup(
     name="emergent",
