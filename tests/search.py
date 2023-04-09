@@ -9,6 +9,7 @@ def google_search(query):
     serpapi = SerpAPIWrapper()
     return serpapi.run(query)
 
+
 agent = ChatAgent(tools=[google_search], model="gpt-4")
 
 agent.run()

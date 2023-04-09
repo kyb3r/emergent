@@ -176,7 +176,7 @@ class ChatAgent:
             "You can use these tools to help you solve problems."
         )
         self.instructions = (
-            '\n\nYou must start every message with {{hidden thought=your extremely concise reasoning and next steps}}\n'
+            "\n\nYou must start every message with {{hidden thought=your extremely concise reasoning and next steps}}\n"
             "[tool usage or response to the user here]\n"
             "Think step by step in your thoughts about whether you need to use a tool or not. (they are not visible to the user)\n\n"
         )
@@ -189,7 +189,7 @@ class ChatAgent:
                 self.personality += "You also have access to a variety of other tools that you can use to help you solve problems.\n\n"
 
         self.tool_usage = self.tool_manager.format_tool_usage()
-    
+
     @property
     def system_prompt(self):
         return self.personality + self.instructions + self.tool_usage
@@ -232,7 +232,6 @@ class ChatAgent:
         yield text
 
         for chunk in response:
-
             delta = chunk.choices[0].delta
             if "content" not in delta:
                 break

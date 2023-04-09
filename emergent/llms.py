@@ -110,13 +110,15 @@ def chat_gpt_prompt(func):
             raise ValueError(
                 "Returned value must be a string or emergent.Prompt object"
             )
-        
+
         # Handles breach of GPT-3.5 token limit
         total_tokens = num_tokens_from_messages(messages, model=model)
         if total_tokens > 4096:
-            logging.warning("The number of tokens in the prompt exceeds the limit of of GPT-3.5 (4096 tokens). Temporarily switching to GPT-4.")
-            model = 'gpt-4'
-            
+            logging.warning(
+                "The number of tokens in the prompt exceeds the limit of of GPT-3.5 (4096 tokens). Temporarily switching to GPT-4."
+            )
+            model = "gpt-4"
+
         response = openai_chat_completion(
             model=model,
             messages=messages,

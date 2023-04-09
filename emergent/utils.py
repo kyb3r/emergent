@@ -50,14 +50,19 @@ def process_response(response):
         if (token == "{{hidden" or token == "{{") and not thinking:
             print_colored("[thinking...]\n", Fore.YELLOW)
             thinking = True
-        elif token in [" __","__"] and not using_tool and not thinking:
+        elif token in [" __", "__"] and not using_tool and not thinking:
             print_colored("[using tool...] ", Fore.GREEN)
             current_tool_name = ""
             using_tool = True
             started_tool = True
-        elif not using_tool and not thinking and not current_tool_name and isinstance(token, str):
+        elif (
+            not using_tool
+            and not thinking
+            and not current_tool_name
+            and isinstance(token, str)
+        ):
             print_colored(token)
-        
+
         if isinstance(token, dict):
             if "tool_name" in token:
                 print_colored(f'args {token["tool_params"]}\n', Fore.LIGHTGREEN_EX)
@@ -79,6 +84,7 @@ def process_response(response):
         if ("}}" in token.strip()) and thinking:
             thinking = False
 
+
 def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
     """Returns the number of tokens used by a list of messages."""
     try:
@@ -90,13 +96,17 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
     elif model == "gpt-4":
         return num_tokens_from_messages(messages, model="gpt-4-0314")
     elif model == "gpt-3.5-turbo-0301":
-        tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
+        tokens_per_message = (
+            4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
+        )
         tokens_per_name = -1  # if there's a name, the role is omitted
     elif model == "gpt-4-0314":
         tokens_per_message = 3
         tokens_per_name = 1
     else:
-        raise NotImplementedError(f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")
+        raise NotImplementedError(
+            f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens."""
+        )
     num_tokens = 0
     for message in messages:
         num_tokens += tokens_per_message
